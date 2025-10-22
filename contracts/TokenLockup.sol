@@ -5,13 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title TokenLockup
  * @notice Manages token lockup with vesting schedules
  * @dev Implements linear vesting with cliff period
  */
-contract TokenLockup is Ownable, ReentrancyGuard {
+contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
 
     struct LockupInfo {
@@ -103,7 +104,7 @@ contract TokenLockup is Ownable, ReentrancyGuard {
     /**
      * @notice Release vested tokens to beneficiary
      */
-    function release() external nonReentrant {
+    function release() external nonReentrant whenNotPaused {
         LockupInfo storage lockup = lockups[msg.sender];
         if (lockup.totalAmount == 0) revert NoLockupFound();
         if (lockup.revoked) revert AlreadyRevoked();
@@ -184,5 +185,21 @@ contract TokenLockup is Ownable, ReentrancyGuard {
 
         uint256 timeFromStart = block.timestamp - lockup.startTime;
         return (lockup.totalAmount * timeFromStart) / lockup.vestingDuration;
+    }
+
+    /**
+     * @notice Pause the contract - blocks token releases
+     * @dev Only owner can pause. Used in emergency situations.
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @notice Unpause the contract - restores normal operations
+     * @dev Only owner can unpause
+     */
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }

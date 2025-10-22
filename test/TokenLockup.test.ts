@@ -373,4 +373,96 @@ describe('TokenLockup', function () {
       expect(releasableAmount).to.equal(vestedAmount - lockup.releasedAmount);
     });
   });
+
+  describe('Pause Functionality', function () {
+    beforeEach(async function () {
+      // Create a lockup for testing pause functionality
+      await tokenLockup.createLockup(
+        beneficiary.address,
+        TOTAL_AMOUNT,
+        CLIFF_DURATION,
+        VESTING_DURATION,
+        false
+      );
+    });
+
+    it('Should allow owner to pause the contract', async function () {
+      await expect(tokenLockup.pause()).to.not.be.reverted;
+      expect(await tokenLockup.paused()).to.equal(true);
+    });
+
+    it('Should allow owner to unpause the contract', async function () {
+      await tokenLockup.pause();
+      await expect(tokenLockup.unpause()).to.not.be.reverted;
+      expect(await tokenLockup.paused()).to.equal(false);
+    });
+
+    it('Should prevent non-owner from pausing', async function () {
+      await expect(tokenLockup.connect(beneficiary).pause()).to.be.revertedWithCustomError(
+        tokenLockup,
+        'OwnableUnauthorizedAccount'
+      );
+    });
+
+    it('Should prevent non-owner from unpausing', async function () {
+      await tokenLockup.pause();
+      await expect(tokenLockup.connect(beneficiary).unpause()).to.be.revertedWithCustomError(
+        tokenLockup,
+        'OwnableUnauthorizedAccount'
+      );
+    });
+
+    it('Should block release when paused', async function () {
+      // Fast forward past cliff
+      await time.increase(VESTING_DURATION / 2);
+
+      // Pause the contract
+      await tokenLockup.pause();
+
+      // Try to release tokens - should fail
+      await expect(tokenLockup.connect(beneficiary).release()).to.be.revertedWithCustomError(
+        tokenLockup,
+        'EnforcedPause'
+      );
+    });
+
+    it('Should allow release after unpause', async function () {
+      // Fast forward past cliff
+      await time.increase(VESTING_DURATION / 2);
+
+      // Pause and unpause
+      await tokenLockup.pause();
+      await tokenLockup.unpause();
+
+      // Release should work now
+      await expect(tokenLockup.connect(beneficiary).release()).to.not.be.reverted;
+    });
+
+    it('Should allow revoke to work when paused', async function () {
+      // Create a revocable lockup
+      await token.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
+      await tokenLockup.createLockup(
+        otherAccount.address,
+        TOTAL_AMOUNT,
+        CLIFF_DURATION,
+        VESTING_DURATION,
+        true // revocable
+      );
+
+      // Pause the contract
+      await tokenLockup.pause();
+
+      // Revoke should still work (for emergency recovery)
+      await expect(tokenLockup.revoke(otherAccount.address)).to.not.be.reverted;
+    });
+
+    it('Should emit Paused event', async function () {
+      await expect(tokenLockup.pause()).to.emit(tokenLockup, 'Paused').withArgs(owner.address);
+    });
+
+    it('Should emit Unpaused event', async function () {
+      await tokenLockup.pause();
+      await expect(tokenLockup.unpause()).to.emit(tokenLockup, 'Unpaused').withArgs(owner.address);
+    });
+  });
 });

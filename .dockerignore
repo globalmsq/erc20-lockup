@@ -1,0 +1,12 @@
+node_modules
+.env
+.git
+.gitignore
+*.md
+dist
+coverage
+cache
+artifacts
+typechain-types
+.DS_Store
+*.log

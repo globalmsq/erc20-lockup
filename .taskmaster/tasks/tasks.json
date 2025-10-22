@@ -1,0 +1,139 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup development environment and initialize project",
+        "description": "Configure Hardhat project with TypeScript support, install dependencies, and set up project structure for Polygon deployment",
+        "details": "Initialize Hardhat project with TypeScript configuration. Install required dependencies: @openzeppelin/contracts@5.0.0, @openzeppelin/contracts-upgradeable@5.0.0, hardhat, ethers, typechain, and testing libraries. Configure hardhat.config.ts for Polygon mainnet (chainId: 137) and Amoy testnet (chainId: 80002). Set up Solidity compiler version 0.8.24 with optimizer enabled (runs: 200) and viaIR: true for gas optimization. Create project structure with contracts/, scripts/, test/ directories. Configure .env file for PRIVATE_KEY, POLYGONSCAN_API_KEY, and RPC endpoints",
+        "testStrategy": "Verify successful compilation of a sample contract, confirm network connectivity to Polygon RPC endpoints, ensure all dependencies are correctly installed and TypeScript configuration is working",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement core TokenLockup contract structure",
+        "description": "Create the main TokenLockup contract with LockupInfo struct, state variables, and basic contract architecture using OpenZeppelin utilities",
+        "details": "Create TokenLockup.sol inheriting from ReentrancyGuard, Pausable, and Ownable. Define LockupInfo struct with fields: totalAmount, releasedAmount, startTime, cliffDuration, vestingDuration, revocable, revoked. Implement state variables: mapping(address => LockupInfo) public lockups, IERC20 public immutable token. Use SafeERC20 for token operations. Define custom errors: InvalidAmount(), NoTokensAvailable(), NotRevocable(), LockupAlreadyExists(), InvalidBeneficiary(), InvalidDuration(). Implement constructor to set token address and owner",
+        "testStrategy": "Unit tests for contract deployment, verify correct inheritance, test struct initialization, validate custom errors are properly defined, check immutable token address is set correctly",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Implement createLockup function with validation",
+        "description": "Develop the createLockup function for admin to create new token lockups with cliff and vesting parameters",
+        "details": "Implement createLockup(address beneficiary, uint256 amount, uint256 cliffDuration, uint256 vestingDuration, bool revocable) with onlyOwner modifier. Validate: beneficiary != address(0), amount > 0, vestingDuration >= cliffDuration, no existing lockup for beneficiary. Transfer tokens from owner to contract using safeTransferFrom. Create LockupInfo entry with block.timestamp as startTime. Emit TokensLocked event with all parameters. Consider using MONTH_DURATION constant (30 days) and SAFETY_MARGIN (1 hour) for time calculations",
+        "testStrategy": "Test successful lockup creation with various parameters, verify token transfer from owner to contract, test validation for zero address, zero amount, invalid durations, existing lockup rejection, verify event emission with correct parameters",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Implement vesting calculation logic",
+        "description": "Create view functions for calculating vested and releasable amounts based on linear vesting formula",
+        "details": "Implement vestedAmount(address beneficiary) function using formula: vestedAmount = (totalAmount × timeFromStart) / vestingDuration. Account for cliff period - return 0 if block.timestamp < startTime + cliffDuration. Cap at totalAmount if fully vested. Implement releasableAmount(address beneficiary) = vestedAmount - releasedAmount. Handle edge cases: revoked lockups, no lockup exists. Use unchecked blocks for gas optimization where overflow impossible. Ensure calculations are timestamp-manipulation resistant using monthly periods",
+        "testStrategy": "Test vesting calculations at various time points: before cliff, immediately after cliff, 25%, 50%, 75%, 100% vested. Verify edge cases: revoked lockups return 0, non-existent lockups return 0. Test timestamp safety margins",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Implement release function with Pull Payment pattern",
+        "description": "Develop the release function allowing beneficiaries to claim vested tokens using Pull Payment pattern",
+        "details": "Implement release() external nonReentrant whenNotPaused function. Calculate releasable amount for msg.sender. Revert with NoTokensAvailable() if amount is 0. Update lockups[msg.sender].releasedAmount. Use safeTransfer to send tokens to beneficiary. Emit TokensReleased event with beneficiary and amount. Implement gas-efficient storage updates. Consider implementing a minimum release amount to prevent dust attacks",
+        "testStrategy": "Test successful token release after vesting, verify reentrancy protection, test pause functionality blocks release, verify correct amount calculation and transfer, test multiple releases over time, verify event emission",
+        "priority": "high",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Implement revoke function for lockup cancellation",
+        "description": "Create the revoke function allowing admin to cancel revocable lockups and reclaim unvested tokens",
+        "details": "Implement revoke(address beneficiary) external onlyOwner nonReentrant function. Validate lockup exists and is revocable, not already revoked. Calculate vested amount at revocation time. Set lockups[beneficiary].revoked = true. Calculate refund amount (totalAmount - vestedAmount). If beneficiary has unreleased vested tokens, calculate and keep them available. Transfer refund amount back to owner using safeTransfer. Emit LockupRevoked event with beneficiary and refundAmount",
+        "testStrategy": "Test revocation of revocable lockups at various vesting stages, verify non-revocable lockups cannot be revoked, test already revoked lockups cannot be revoked again, verify correct refund calculations, test that vested but unreleased tokens remain claimable",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Implement Emergency Pause mechanism",
+        "description": "Add emergency pause functionality to halt token releases in case of security issues",
+        "details": "Implement pause() and unpause() functions with onlyOwner modifier inherited from Pausable. Apply whenNotPaused modifier to release() and partialRelease() functions. Ensure revoke() can still be called when paused (for emergency recovery). Add events for Paused and Unpaused (inherited from Pausable). Document pause scenarios: critical bug discovery, hack attempt detection, abnormal trading patterns",
+        "testStrategy": "Test pause blocks release function, verify unpause restores functionality, test revoke still works when paused, verify only owner can pause/unpause, test event emissions",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Implement partialRelease function for special cases",
+        "description": "Develop admin-controlled partial release function for milestone rewards or emergency situations",
+        "details": "Implement partialRelease(address beneficiary, uint256 amount) external onlyOwner nonReentrant whenNotPaused. Validate lockup exists and not revoked. Ensure amount <= 10% of totalAmount (recommended limit). Update releasedAmount accordingly. Transfer tokens to beneficiary. Emit PartialTokensReleased event. Consider adding a cooldown period between partial releases. Document use cases: milestone achievements, emergency funding needs",
+        "testStrategy": "Test partial release with various amounts, verify 10% limit enforcement, test interaction with normal vesting schedule, verify released amount updates correctly, test event emission",
+        "priority": "low",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Write comprehensive test suite",
+        "description": "Develop complete test coverage for all contract functions, edge cases, and security scenarios",
+        "details": "Write tests using Hardhat/Ethers/Chai/TypeChain. Cover: deployment scenarios, lockup creation variations, time-based vesting calculations using time helpers, cliff period behavior, full vesting cycle, revocation at different stages, pause/unpause functionality, partial release scenarios, reentrancy attack simulations, gas consumption analysis with hardhat-gas-reporter. Achieve >95% code coverage. Test error cases: zero amounts, invalid addresses, unauthorized access attempts",
+        "testStrategy": "Use coverage tools to ensure >95% coverage, implement fuzzing tests for numerical inputs, test gas consumption stays within acceptable limits, verify all custom errors are tested, use time manipulation helpers for vesting timeline tests",
+        "priority": "high",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Create deployment scripts and verification tools",
+        "description": "Develop deployment scripts for Amoy testnet and Polygon mainnet with automated verification",
+        "details": "Create deploy scripts for Amoy (scripts/deploy-amoy.ts) and mainnet (scripts/deploy-mainnet.ts). Implement SUT token address configuration: Amoy: 0xE4C687167705Abf55d709395f92e254bdF5825a2, Mainnet: 0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55. Add contract verification scripts using Polygonscan API. Create helper scripts for common operations: checking lockup status, calculating vested amounts. Implement deployment validation: verify token address, check owner permissions, validate initial state. Add scripts to package.json for easy execution",
+        "testStrategy": "Test deployment on local Hardhat network first, verify correct token addresses are used per network, test Polygonscan verification works on Amoy, validate deployment gas costs are reasonable, ensure scripts handle errors gracefully",
+        "priority": "medium",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-10-22T06:36:38.196Z",
+      "updated": "2025-10-22T06:36:38.196Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

@@ -4,7 +4,10 @@ async function main() {
   const [deployer] = await ethers.getSigners();
 
   console.log('Deploying contracts with account:', deployer.address);
-  console.log('Account balance:', ethers.formatEther(await ethers.provider.getBalance(deployer.address)));
+  console.log(
+    'Account balance:',
+    ethers.formatEther(await ethers.provider.getBalance(deployer.address))
+  );
 
   // Get token address from environment or deploy mock for testing
   let tokenAddress = process.env.TOKEN_ADDRESS;
@@ -12,11 +15,7 @@ async function main() {
   if (!tokenAddress) {
     console.log('\nNo TOKEN_ADDRESS found, deploying MockERC20 for testing...');
     const MockERC20 = await ethers.getContractFactory('MockERC20');
-    const mockToken = await MockERC20.deploy(
-      'Test Token',
-      'TEST',
-      ethers.parseEther('1000000')
-    );
+    const mockToken = await MockERC20.deploy('Test Token', 'TEST', ethers.parseEther('1000000'));
     await mockToken.waitForDeployment();
     tokenAddress = await mockToken.getAddress();
     console.log('MockERC20 deployed to:', tokenAddress);
@@ -48,7 +47,9 @@ async function main() {
   // Verification instructions
   if (process.env.POLYGONSCAN_API_KEY) {
     console.log('\n=== Verification Command ===');
-    console.log(`npx hardhat verify --network ${deploymentInfo.network} ${lockupAddress} ${tokenAddress}`);
+    console.log(
+      `npx hardhat verify --network ${deploymentInfo.network} ${lockupAddress} ${tokenAddress}`
+    );
   }
 }
 

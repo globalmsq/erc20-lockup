@@ -43,9 +43,10 @@ describe('TokenLockup', function () {
 
     it('Should revert with zero token address', async function () {
       const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
-      await expect(
-        TokenLockupFactory.deploy(ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(tokenLockup, 'InvalidBeneficiary');
+      await expect(TokenLockupFactory.deploy(ethers.ZeroAddress)).to.be.revertedWithCustomError(
+        tokenLockup,
+        'InvalidBeneficiary'
+      );
     });
   });
 
@@ -220,15 +221,17 @@ describe('TokenLockup', function () {
     });
 
     it('Should revert when no tokens are available for release', async function () {
-      await expect(
-        tokenLockup.connect(beneficiary).release()
-      ).to.be.revertedWithCustomError(tokenLockup, 'NoTokensAvailable');
+      await expect(tokenLockup.connect(beneficiary).release()).to.be.revertedWithCustomError(
+        tokenLockup,
+        'NoTokensAvailable'
+      );
     });
 
     it('Should revert when no lockup exists', async function () {
-      await expect(
-        tokenLockup.connect(otherAccount).release()
-      ).to.be.revertedWithCustomError(tokenLockup, 'NoLockupFound');
+      await expect(tokenLockup.connect(otherAccount).release()).to.be.revertedWithCustomError(
+        tokenLockup,
+        'NoLockupFound'
+      );
     });
 
     it('Should allow multiple releases', async function () {
@@ -295,23 +298,26 @@ describe('TokenLockup', function () {
         false
       );
 
-      await expect(
-        tokenLockup.revoke(otherAccount.address)
-      ).to.be.revertedWithCustomError(tokenLockup, 'NotRevocable');
+      await expect(tokenLockup.revoke(otherAccount.address)).to.be.revertedWithCustomError(
+        tokenLockup,
+        'NotRevocable'
+      );
     });
 
     it('Should revert when already revoked', async function () {
       await tokenLockup.revoke(beneficiary.address);
 
-      await expect(
-        tokenLockup.revoke(beneficiary.address)
-      ).to.be.revertedWithCustomError(tokenLockup, 'AlreadyRevoked');
+      await expect(tokenLockup.revoke(beneficiary.address)).to.be.revertedWithCustomError(
+        tokenLockup,
+        'AlreadyRevoked'
+      );
     });
 
     it('Should revert when lockup does not exist', async function () {
-      await expect(
-        tokenLockup.revoke(otherAccount.address)
-      ).to.be.revertedWithCustomError(tokenLockup, 'NoLockupFound');
+      await expect(tokenLockup.revoke(otherAccount.address)).to.be.revertedWithCustomError(
+        tokenLockup,
+        'NoLockupFound'
+      );
     });
 
     it('Should revert when called by non-owner', async function () {
@@ -323,9 +329,10 @@ describe('TokenLockup', function () {
     it('Should prevent release after revoke', async function () {
       await tokenLockup.revoke(beneficiary.address);
 
-      await expect(
-        tokenLockup.connect(beneficiary).release()
-      ).to.be.revertedWithCustomError(tokenLockup, 'AlreadyRevoked');
+      await expect(tokenLockup.connect(beneficiary).release()).to.be.revertedWithCustomError(
+        tokenLockup,
+        'AlreadyRevoked'
+      );
     });
   });
 

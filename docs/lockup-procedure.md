@@ -360,7 +360,51 @@ LOCKUP_ADDRESS=0xABCD1234... npx hardhat run scripts/release.ts --network polygo
 
 ## 확인 및 검증
 
-### 5.1 PolygonScan 확인
+### 5.1 Helper Scripts로 Lockup 상태 확인
+
+프로젝트에서 제공하는 Helper Scripts를 사용하면 Lockup 상태를 쉽게 확인하고 관리할 수 있습니다.
+
+#### Lockup 상태 조회
+```bash
+export LOCKUP_ADDRESS=0xABCD1234...
+export BENEFICIARY_ADDRESS=0x수혜자주소...
+
+npx hardhat run scripts/check-lockup.ts --network polygon
+```
+
+**출력 정보:**
+- 총 락업량, 해제된 양, 베스팅된 양, 해제 가능한 양
+- 베스팅 진행률 (%)
+- 타임라인 (시작, Cliff 종료, 베스팅 종료)
+- 현재 상태 및 남은 기간
+
+#### 베스팅 타임라인 계산
+```bash
+export LOCKUP_ADDRESS=0xABCD1234...
+export BENEFICIARY_ADDRESS=0x수혜자주소...
+
+npx hardhat run scripts/calculate-vested.ts --network polygon
+```
+
+**출력 정보:**
+- 주요 마일스톤별 베스팅 계산 (시작, Cliff, 25%, 50%, 75%, 종료)
+- 월별 베스팅 내역 (장기 베스팅의 경우)
+- 현재 상태 및 진행률
+
+#### 대화형 Lockup 생성
+```bash
+export LOCKUP_ADDRESS=0xABCD1234...
+
+npx hardhat run scripts/create-lockup-helper.ts --network polygon
+```
+
+이 스크립트는 다음을 안내합니다:
+- 수혜자 주소, 락업량, Cliff 기간, 베스팅 기간 입력
+- 입력값 검증 및 요약 표시
+- 토큰 Approve 상태 확인 및 자동 처리
+- Lockup 생성 실행
+
+### 5.2 PolygonScan 확인
 
 **Amoy 테스트넷:**
 ```
@@ -377,7 +421,7 @@ https://polygonscan.com/address/0xABCD1234...
 - ✅ Transactions 탭: createLockup, release 트랜잭션
 - ✅ Events 탭: TokensLocked, TokensReleased 이벤트
 
-### 5.2 각 단계별 확인
+### 5.3 각 단계별 확인
 
 #### Step 1 확인: 배포
 ```bash

@@ -11,7 +11,6 @@ SUT Token Lockup smart contract for managing token vesting schedules on Polygon.
 - Hardhat + TypeScript
 - OpenZeppelin contracts (v5.0.0)
 - Polygon (Mainnet + Amoy Testnet)
-- Docker for local Hardhat node
 
 ## SUT Token Addresses
 
@@ -20,7 +19,7 @@ SUT Token Lockup smart contract for managing token vesting schedules on Polygon.
 - **Polygon Mainnet:** `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55`
 - **Polygon Amoy Testnet:** `0xE4C687167705Abf55d709395f92e254bdF5825a2`
 
-Set `TOKEN_ADDRESS` in `.env` for production deployments. Leave empty for local testing (deploys MockERC20).
+Set `TOKEN_ADDRESS` in `.env` for deployment to the appropriate network. If empty, the deployment script will deploy MockERC20 for testing purposes.
 
 ## Development Commands
 
@@ -40,7 +39,6 @@ pnpm format               # Format code with Prettier
 ```bash
 pnpm deploy:amoy          # Deploy to Polygon Amoy testnet
 pnpm deploy:polygon       # Deploy to Polygon mainnet
-pnpm deploy:local         # Deploy to local Hardhat node
 
 # Verify on PolygonScan
 export CONTRACT_ADDRESS=0x...
@@ -49,15 +47,19 @@ pnpm verify:amoy          # Verify on Amoy
 pnpm verify:polygon       # Verify on mainnet
 ```
 
-### Docker Local Testing
+### Helper Scripts
 ```bash
-pnpm docker:up            # Start local Hardhat node in Docker
-pnpm docker:logs          # View Hardhat node logs
-pnpm docker:deploy        # Deploy to Docker network
-pnpm docker:down          # Stop Docker containers
-```
+# Check lockup status
+export LOCKUP_ADDRESS=0x...
+export BENEFICIARY_ADDRESS=0x...
+npx hardhat run scripts/check-lockup.ts --network polygon
 
-**Note:** Local Hardhat node runs on `http://localhost:8545` (outside Docker) or `http://hardhat-node:8545` (inside Docker network).
+# Calculate vesting timeline
+npx hardhat run scripts/calculate-vested.ts --network polygon
+
+# Interactive lockup creation
+npx hardhat run scripts/create-lockup-helper.ts --network polygon
+```
 
 ## Architecture
 
@@ -155,9 +157,7 @@ npx hardhat test --grep "Should release vested tokens"
 ## Network Configuration
 
 **Hardhat Networks:**
-- `hardhat`: Local development (chainId: 31337)
-- `localhost`: Local Hardhat node (http://127.0.0.1:8545)
-- `docker`: Docker Hardhat node (http://hardhat-node:8545)
+- `hardhat`: Local development (chainId: 31337) - for testing only
 - `polygon`: Polygon Mainnet (chainId: 137)
 - `amoy`: Polygon Amoy Testnet (chainId: 80002)
 

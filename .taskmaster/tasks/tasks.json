@@ -135,15 +135,30 @@
         "dependencies": [
           "9"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2025-10-22T10:29:49.930Z"
+      },
+      {
+        "id": "11",
+        "title": "Remove local chain deployment infrastructure",
+        "description": "Clean up all Docker-related deployment infrastructure and local chain configurations, keeping only Amoy testnet and Polygon mainnet deployment options",
+        "details": "Remove Docker infrastructure files: delete docker-compose.yml and Dockerfile from project root. Update package.json to remove Docker-related scripts: docker:up, docker:down, docker:logs, docker:deploy. Modify hardhat.config.ts to remove network configurations for 'localhost' and 'docker' networks, keeping only 'hardhat' (for testing), 'amoy', and 'polygon' networks. Update README.md to remove all Docker setup instructions and local deployment references. Update CLAUDE.md to remove Docker commands section and local testing references. Review and update docs/lockup-procedure.md to remove any local deployment steps. Ensure deployment scripts in scripts/ directory only reference Amoy and Polygon mainnet. Remove any references to http://localhost:8545 or http://hardhat-node:8545 from configuration files. Update .env.example to clarify that only Amoy and Polygon deployments are supported",
+        "testStrategy": "Verify docker-compose.yml and Dockerfile are deleted from project root. Check package.json no longer contains docker:* scripts. Confirm hardhat.config.ts only has hardhat, amoy, and polygon network configurations. Review all documentation files (README.md, CLAUDE.md, docs/*.md) to ensure no Docker or local deployment references remain. Run 'npm run compile' and 'npm test' to ensure removal doesn't break existing functionality. Attempt deployment to Amoy testnet to confirm deployment still works without local infrastructure",
+        "status": "in-progress",
+        "dependencies": [
+          "10"
+        ],
+        "priority": "medium",
+        "subtasks": [],
+        "updatedAt": "2025-10-22T10:33:18.658Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-10-22T07:52:42.770Z",
-      "taskCount": 10,
-      "completedCount": 8,
+      "lastModified": "2025-10-22T10:33:18.658Z",
+      "taskCount": 11,
+      "completedCount": 9,
       "tags": [
         "master"
       ]

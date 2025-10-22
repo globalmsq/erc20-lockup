@@ -18,15 +18,6 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 31337,
     },
-    localhost: {
-      url: 'http://127.0.0.1:8545',
-      chainId: 31337,
-    },
-    docker: {
-      url: 'http://hardhat-node:8545',
-      chainId: 31337,
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-    },
     polygon: {
       url: process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com',
       chainId: 137,

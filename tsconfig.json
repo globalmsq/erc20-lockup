@@ -18,11 +18,6 @@
     "typeRoots": ["./node_modules/@types", "./typechain-types"],
     "types": ["node", "mocha", "chai"]
   },
-  "include": [
-    "scripts/**/*.ts",
-    "test/**/*.ts",
-    "typechain-types/**/*.ts",
-    "hardhat.config.ts"
-  ],
+  "include": ["scripts/**/*.ts", "test/**/*.ts", "typechain-types/**/*.ts", "hardhat.config.ts"],
   "exclude": ["node_modules", "dist", "cache", "artifacts"]
 }

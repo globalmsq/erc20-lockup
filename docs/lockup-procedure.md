@@ -5,6 +5,7 @@ SUT 토큰을 TokenLockup 컨트랙트에 락업하고 베스팅하는 전체 �
 ---
 
 ## 목차
+
 1. [사전 준비사항](#1-사전-준비사항)
 2. [Step 1: TokenLockup 컨트랙트 배포](#step-1-tokenlockup-컨트랙트-배포)
 3. [Step 2: SUT 토큰 Approve](#step-2-sut-토큰-approve)
@@ -19,21 +20,23 @@ SUT 토큰을 TokenLockup 컨트랙트에 락업하고 베스팅하는 전체 �
 
 ### 1.1 필요한 정보
 
-| 항목 | Mainnet | Amoy Testnet |
-|------|---------|--------------|
+| 항목              | Mainnet                                      | Amoy Testnet                                 |
+| ----------------- | -------------------------------------------- | -------------------------------------------- |
 | **SUT 토큰 주소** | `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55` | `0xE4C687167705Abf55d709395f92e254bdF5825a2` |
-| **네트워크** | Polygon | Polygon Amoy |
-| **Chain ID** | 137 | 80002 |
-| **Explorer** | https://polygonscan.com | https://amoy.polygonscan.com |
+| **네트워크**      | Polygon                                      | Polygon Amoy                                 |
+| **Chain ID**      | 137                                          | 80002                                        |
+| **Explorer**      | https://polygonscan.com                      | https://amoy.polygonscan.com                 |
 
 ### 1.2 필요한 계정 및 권한
 
 **관리자 (Owner/Admin):**
+
 - TokenLockup 컨트랙트 배포 권한
 - SUT 토큰 보유 (락업할 수량만큼)
 - 가스비용 (MATIC)
 
 **수혜자 (Beneficiary):**
+
 - 토큰을 받을 지갑 주소
 - 가스비용 (토큰 해제 시)
 
@@ -45,12 +48,12 @@ SUT 토큰을 TokenLockup 컨트랙트에 락업하고 베스팅하는 전체 �
 # Mainnet 배포
 PRIVATE_KEY=your_private_key_here
 TOKEN_ADDRESS=0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55
-POLYGONSCAN_API_KEY=your_api_key
+ETHERSCAN_API_KEY=your_etherscan_api_key  # Etherscan API V2 - 60+ 체인 지원
 
 # Amoy Testnet 배포
 PRIVATE_KEY=your_private_key_here
 TOKEN_ADDRESS=0xE4C687167705Abf55d709395f92e254bdF5825a2
-POLYGONSCAN_API_KEY=your_api_key
+ETHERSCAN_API_KEY=your_etherscan_api_key  # 동일한 키 사용
 ```
 
 ---
@@ -69,6 +72,7 @@ pnpm deploy:amoy
 ```
 
 **예상 출력:**
+
 ```
 Deploying contracts with account: 0x...
 Account balance: 1.234567 MATIC
@@ -90,6 +94,7 @@ TokenLockup deployed to: 0xABCD1234...
 ```
 
 **배포된 컨트랙트 주소를 기록하세요:**
+
 ```
 TokenLockup Address: 0xABCD1234...
 ```
@@ -142,27 +147,27 @@ npx hardhat console --network polygon
 // 1. 계정 및 컨트랙트 설정
 const [owner] = await ethers.getSigners();
 const sutToken = await ethers.getContractAt(
-  "IERC20",
-  "0xE4C687167705Abf55d709395f92e254bdF5825a2"  // Amoy
+  'IERC20',
+  '0xE4C687167705Abf55d709395f92e254bdF5825a2' // Amoy
   // "0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55"  // Mainnet
 );
 
-const tokenLockupAddress = "0xABCD1234...";  // Step 1에서 배포된 주소
+const tokenLockupAddress = '0xABCD1234...'; // Step 1에서 배포된 주소
 
 // 2. 현재 잔액 확인
 const balance = await sutToken.balanceOf(owner.address);
-console.log("SUT Balance:", ethers.formatEther(balance));
+console.log('SUT Balance:', ethers.formatEther(balance));
 
 // 3. Approve 실행 (예: 10,000 SUT)
-const approveAmount = ethers.parseEther("10000");
+const approveAmount = ethers.parseEther('10000');
 const tx = await sutToken.approve(tokenLockupAddress, approveAmount);
 await tx.wait();
 
-console.log("✅ Approved:", ethers.formatEther(approveAmount), "SUT");
+console.log('✅ Approved:', ethers.formatEther(approveAmount), 'SUT');
 
 // 4. Approve 확인
 const allowance = await sutToken.allowance(owner.address, tokenLockupAddress);
-console.log("Allowance:", ethers.formatEther(allowance));
+console.log('Allowance:', ethers.formatEther(allowance));
 ```
 
 ### 2.3 스크립트 파일로 실행
@@ -175,26 +180,24 @@ import { ethers } from 'hardhat';
 async function main() {
   const [owner] = await ethers.getSigners();
 
-  const sutToken = await ethers.getContractAt(
-    "IERC20",
-    process.env.TOKEN_ADDRESS!
-  );
+  const sutToken = await ethers.getContractAt('IERC20', process.env.TOKEN_ADDRESS!);
 
   const tokenLockupAddress = process.env.LOCKUP_ADDRESS!;
-  const approveAmount = ethers.parseEther("10000");  // 승인할 수량
+  const approveAmount = ethers.parseEther('10000'); // 승인할 수량
 
-  console.log("Approving", ethers.formatEther(approveAmount), "SUT");
+  console.log('Approving', ethers.formatEther(approveAmount), 'SUT');
 
   const tx = await sutToken.approve(tokenLockupAddress, approveAmount);
   await tx.wait();
 
-  console.log("✅ Approved successfully!");
+  console.log('✅ Approved successfully!');
 }
 
 main().catch(console.error);
 ```
 
 실행:
+
 ```bash
 LOCKUP_ADDRESS=0xABCD1234... npx hardhat run scripts/approve.ts --network amoy
 ```
@@ -210,16 +213,16 @@ LOCKUP_ADDRESS=0xABCD1234... npx hardhat run scripts/approve.ts --network amoy
 
 // 1. TokenLockup 컨트랙트 연결
 const tokenLockup = await ethers.getContractAt(
-  "TokenLockup",
-  "0xABCD1234..."  // TokenLockup 주소
+  'TokenLockup',
+  '0xABCD1234...' // TokenLockup 주소
 );
 
 // 2. Lockup 파라미터 설정
-const beneficiaryAddress = "0x1234...";           // 수혜자 주소
-const lockupAmount = ethers.parseEther("10000");  // 10,000 SUT
-const cliffDuration = 30 * 24 * 60 * 60;         // 30일 (Cliff)
+const beneficiaryAddress = '0x1234...'; // 수혜자 주소
+const lockupAmount = ethers.parseEther('10000'); // 10,000 SUT
+const cliffDuration = 30 * 24 * 60 * 60; // 30일 (Cliff)
 const vestingDuration = 100 * 30 * 24 * 60 * 60; // 100개월 (전체 베스팅)
-const revocable = true;                           // 취소 가능 여부
+const revocable = true; // 취소 가능 여부
 
 // 3. Lockup 생성
 const tx = await tokenLockup.createLockup(
@@ -231,21 +234,22 @@ const tx = await tokenLockup.createLockup(
 );
 
 const receipt = await tx.wait();
-console.log("✅ Lockup created! Tx:", receipt.hash);
+console.log('✅ Lockup created! Tx:', receipt.hash);
 
 // 4. Lockup 정보 확인
 const lockupInfo = await tokenLockup.lockups(beneficiaryAddress);
-console.log("Lockup Info:");
-console.log("  Total Amount:", ethers.formatEther(lockupInfo.totalAmount));
-console.log("  Start Time:", new Date(Number(lockupInfo.startTime) * 1000));
-console.log("  Cliff Duration:", lockupInfo.cliffDuration / (24*60*60), "days");
-console.log("  Vesting Duration:", lockupInfo.vestingDuration / (30*24*60*60), "months");
-console.log("  Revocable:", lockupInfo.revocable);
+console.log('Lockup Info:');
+console.log('  Total Amount:', ethers.formatEther(lockupInfo.totalAmount));
+console.log('  Start Time:', new Date(Number(lockupInfo.startTime) * 1000));
+console.log('  Cliff Duration:', lockupInfo.cliffDuration / (24 * 60 * 60), 'days');
+console.log('  Vesting Duration:', lockupInfo.vestingDuration / (30 * 24 * 60 * 60), 'months');
+console.log('  Revocable:', lockupInfo.revocable);
 ```
 
 ### 3.2 베스팅 스케줄 예시
 
 **설정 예시:**
+
 - 총 락업량: 10,000 SUT
 - Cliff 기간: 30일
 - 베스팅 기간: 100개월
@@ -253,14 +257,14 @@ console.log("  Revocable:", lockupInfo.revocable);
 
 **해제 스케줄:**
 
-| 시점 | 경과 시간 | 해제 가능량 | 누적 해제량 |
-|------|----------|------------|------------|
-| 0일 | 0개월 | 0 SUT | 0 SUT |
-| 30일 | 1개월 | 100 SUT | 100 SUT |
-| 60일 | 2개월 | 100 SUT | 200 SUT |
-| 90일 | 3개월 | 100 SUT | 300 SUT |
-| ... | ... | ... | ... |
-| 3000일 | 100개월 | 100 SUT | 10,000 SUT |
+| 시점   | 경과 시간 | 해제 가능량 | 누적 해제량 |
+| ------ | --------- | ----------- | ----------- |
+| 0일    | 0개월     | 0 SUT       | 0 SUT       |
+| 30일   | 1개월     | 100 SUT     | 100 SUT     |
+| 60일   | 2개월     | 100 SUT     | 200 SUT     |
+| 90일   | 3개월     | 100 SUT     | 300 SUT     |
+| ...    | ...       | ...         | ...         |
+| 3000일 | 100개월   | 100 SUT     | 10,000 SUT  |
 
 ---
 
@@ -272,25 +276,21 @@ console.log("  Revocable:", lockupInfo.revocable);
 
 ```javascript
 // 수혜자 계정으로 연결
-const beneficiary = await ethers.getSigner("0x1234...");  // 수혜자 주소
+const beneficiary = await ethers.getSigner('0x1234...'); // 수혜자 주소
 
-const tokenLockup = await ethers.getContractAt(
-  "TokenLockup",
-  "0xABCD1234...",
-  beneficiary
-);
+const tokenLockup = await ethers.getContractAt('TokenLockup', '0xABCD1234...', beneficiary);
 
 // 현재 해제 가능한 금액 확인
 const releasable = await tokenLockup.releasableAmount(beneficiary.address);
-console.log("Releasable Amount:", ethers.formatEther(releasable), "SUT");
+console.log('Releasable Amount:', ethers.formatEther(releasable), 'SUT');
 
 // 총 베스팅된 금액 확인
 const vested = await tokenLockup.vestedAmount(beneficiary.address);
-console.log("Total Vested:", ethers.formatEther(vested), "SUT");
+console.log('Total Vested:', ethers.formatEther(vested), 'SUT');
 
 // Lockup 정보 확인
 const lockupInfo = await tokenLockup.lockups(beneficiary.address);
-console.log("Already Released:", ethers.formatEther(lockupInfo.releasedAmount), "SUT");
+console.log('Already Released:', ethers.formatEther(lockupInfo.releasedAmount), 'SUT');
 ```
 
 ### 4.2 토큰 해제 실행
@@ -328,30 +328,28 @@ import { ethers } from 'hardhat';
 async function main() {
   const [beneficiary] = await ethers.getSigners();
 
-  const tokenLockup = await ethers.getContractAt(
-    "TokenLockup",
-    process.env.LOCKUP_ADDRESS!
-  );
+  const tokenLockup = await ethers.getContractAt('TokenLockup', process.env.LOCKUP_ADDRESS!);
 
   const releasable = await tokenLockup.releasableAmount(beneficiary.address);
 
   if (releasable === 0n) {
-    console.log("⚠️ No tokens available for release");
+    console.log('⚠️ No tokens available for release');
     return;
   }
 
-  console.log("Releasing:", ethers.formatEther(releasable), "SUT");
+  console.log('Releasing:', ethers.formatEther(releasable), 'SUT');
 
   const tx = await tokenLockup.release();
   await tx.wait();
 
-  console.log("✅ Released successfully!");
+  console.log('✅ Released successfully!');
 }
 
 main().catch(console.error);
 ```
 
 실행 (Cron 등으로 정기 실행 가능):
+
 ```bash
 LOCKUP_ADDRESS=0xABCD1234... npx hardhat run scripts/release.ts --network polygon
 ```
@@ -365,6 +363,7 @@ LOCKUP_ADDRESS=0xABCD1234... npx hardhat run scripts/release.ts --network polygo
 프로젝트에서 제공하는 Helper Scripts를 사용하면 Lockup 상태를 쉽게 확인하고 관리할 수 있습니다.
 
 #### Lockup 상태 조회
+
 ```bash
 export LOCKUP_ADDRESS=0xABCD1234...
 export BENEFICIARY_ADDRESS=0x수혜자주소...
@@ -373,12 +372,14 @@ npx hardhat run scripts/check-lockup.ts --network polygon
 ```
 
 **출력 정보:**
+
 - 총 락업량, 해제된 양, 베스팅된 양, 해제 가능한 양
 - 베스팅 진행률 (%)
 - 타임라인 (시작, Cliff 종료, 베스팅 종료)
 - 현재 상태 및 남은 기간
 
 #### 베스팅 타임라인 계산
+
 ```bash
 export LOCKUP_ADDRESS=0xABCD1234...
 export BENEFICIARY_ADDRESS=0x수혜자주소...
@@ -387,11 +388,13 @@ npx hardhat run scripts/calculate-vested.ts --network polygon
 ```
 
 **출력 정보:**
+
 - 주요 마일스톤별 베스팅 계산 (시작, Cliff, 25%, 50%, 75%, 종료)
 - 월별 베스팅 내역 (장기 베스팅의 경우)
 - 현재 상태 및 진행률
 
 #### 대화형 Lockup 생성
+
 ```bash
 export LOCKUP_ADDRESS=0xABCD1234...
 
@@ -399,6 +402,7 @@ npx hardhat run scripts/create-lockup-helper.ts --network polygon
 ```
 
 이 스크립트는 다음을 안내합니다:
+
 - 수혜자 주소, 락업량, Cliff 기간, 베스팅 기간 입력
 - 입력값 검증 및 요약 표시
 - 토큰 Approve 상태 확인 및 자동 처리
@@ -407,16 +411,19 @@ npx hardhat run scripts/create-lockup-helper.ts --network polygon
 ### 5.2 PolygonScan 확인
 
 **Amoy 테스트넷:**
+
 ```
 https://amoy.polygonscan.com/address/0xABCD1234...
 ```
 
 **Polygon Mainnet:**
+
 ```
 https://polygonscan.com/address/0xABCD1234...
 ```
 
 **확인 항목:**
+
 - ✅ Contract 탭: 컨트랙트 소스 코드 검증 완료
 - ✅ Transactions 탭: createLockup, release 트랜잭션
 - ✅ Events 탭: TokensLocked, TokensReleased 이벤트
@@ -424,29 +431,33 @@ https://polygonscan.com/address/0xABCD1234...
 ### 5.3 각 단계별 확인
 
 #### Step 1 확인: 배포
+
 ```bash
 # 컨트랙트 코드 확인
 npx hardhat verify --network amoy 0xABCD1234... 0xE4C687167705Abf55d709395f92e254bdF5825a2
 ```
 
 #### Step 2 확인: Approve
+
 ```javascript
 const allowance = await sutToken.allowance(ownerAddress, tokenLockupAddress);
-console.log("Approved:", ethers.formatEther(allowance));
+console.log('Approved:', ethers.formatEther(allowance));
 // 출력: Approved: 10000.0
 ```
 
 #### Step 3 확인: Lockup 생성
+
 ```javascript
 const lockupInfo = await tokenLockup.lockups(beneficiaryAddress);
-console.log("Total Amount:", ethers.formatEther(lockupInfo.totalAmount));
+console.log('Total Amount:', ethers.formatEther(lockupInfo.totalAmount));
 // 출력: Total Amount: 10000.0
 ```
 
 #### Step 4 확인: 토큰 해제
+
 ```javascript
 const sutBalance = await sutToken.balanceOf(beneficiaryAddress);
-console.log("Beneficiary SUT Balance:", ethers.formatEther(sutBalance));
+console.log('Beneficiary SUT Balance:', ethers.formatEther(sutBalance));
 // 출력: Beneficiary SUT Balance: 100.0 (1개월 경과 후)
 ```
 
@@ -459,12 +470,13 @@ console.log("Beneficiary SUT Balance:", ethers.formatEther(sutBalance));
 **원인:** Approve가 안되었거나 부족함
 
 **해결:**
+
 ```javascript
 const allowance = await sutToken.allowance(owner.address, tokenLockupAddress);
-console.log("Current Allowance:", ethers.formatEther(allowance));
+console.log('Current Allowance:', ethers.formatEther(allowance));
 
 // 재승인
-await sutToken.approve(tokenLockupAddress, ethers.parseEther("10000"));
+await sutToken.approve(tokenLockupAddress, ethers.parseEther('10000'));
 ```
 
 ### 문제 2: "NoTokensAvailable" 에러
@@ -472,6 +484,7 @@ await sutToken.approve(tokenLockupAddress, ethers.parseEther("10000"));
 **원인:** 아직 베스팅되지 않았거나 Cliff 기간 중
 
 **해결:**
+
 ```javascript
 const lockupInfo = await tokenLockup.lockups(beneficiaryAddress);
 const now = Math.floor(Date.now() / 1000);
@@ -479,7 +492,7 @@ const cliffEnd = Number(lockupInfo.startTime) + Number(lockupInfo.cliffDuration)
 
 if (now < cliffEnd) {
   const remainingSeconds = cliffEnd - now;
-  console.log("Cliff period remaining:", remainingSeconds / (24*60*60), "days");
+  console.log('Cliff period remaining:', remainingSeconds / (24 * 60 * 60), 'days');
 }
 ```
 
@@ -488,6 +501,7 @@ if (now < cliffEnd) {
 **원인:** 해당 수혜자에 대한 락업이 이미 존재
 
 **해결:**
+
 - 다른 수혜자 주소 사용
 - 기존 락업 취소 후 재생성 (revocable인 경우만 가능)
 
@@ -504,14 +518,15 @@ await tokenLockup.createLockup(...);
 **원인:** MATIC 잔액 부족
 
 **해결:**
+
 ```javascript
 // 잔액 확인
 const balance = await ethers.provider.getBalance(address);
-console.log("MATIC Balance:", ethers.formatEther(balance));
+console.log('MATIC Balance:', ethers.formatEther(balance));
 
 // 가스비 예상
 const gasEstimate = await tokenLockup.release.estimateGas();
-console.log("Estimated Gas:", gasEstimate.toString());
+console.log('Estimated Gas:', gasEstimate.toString());
 ```
 
 ---
@@ -520,22 +535,22 @@ console.log("Estimated Gas:", gasEstimate.toString());
 
 ### A. 주요 함수 요약
 
-| 함수 | 호출자 | 목적 |
-|------|--------|------|
-| `createLockup()` | 관리자 | 새 락업 생성 |
-| `release()` | 수혜자 | 베스팅된 토큰 해제 |
-| `revoke()` | 관리자 | 락업 취소 |
+| 함수                 | 호출자 | 목적                |
+| -------------------- | ------ | ------------------- |
+| `createLockup()`     | 관리자 | 새 락업 생성        |
+| `release()`          | 수혜자 | 베스팅된 토큰 해제  |
+| `revoke()`           | 관리자 | 락업 취소           |
 | `releasableAmount()` | 누구나 | 해제 가능 금액 조회 |
-| `vestedAmount()` | 누구나 | 총 베스팅 금액 조회 |
+| `vestedAmount()`     | 누구나 | 총 베스팅 금액 조회 |
 
 ### B. 가스비 예상
 
-| 작업 | 예상 가스 | 비고 |
-|------|----------|------|
-| createLockup | ~150,000 | 첫 락업 생성 |
-| release | ~50,000 | 토큰 해제 |
-| revoke | ~80,000 | 락업 취소 |
-| approve | ~46,000 | ERC20 승인 |
+| 작업         | 예상 가스 | 비고         |
+| ------------ | --------- | ------------ |
+| createLockup | ~150,000  | 첫 락업 생성 |
+| release      | ~50,000   | 토큰 해제    |
+| revoke       | ~80,000   | 락업 취소    |
+| approve      | ~46,000   | ERC20 승인   |
 
 ### C. 베스팅 계산 공식
 
@@ -555,6 +570,7 @@ if (현재시간 < 시작시간 + Cliff기간) {
 ---
 
 **문서 정보**
+
 - 📄 문서명: SUT Token Lockup Procedure
 - 📅 작성일: 2024
 - 📌 버전: 1.0

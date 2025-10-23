@@ -26,10 +26,11 @@ sut-lockup-contract/
 ├── scripts/               # TypeScript scripts (Hardhat direct execution)
 │   ├── deploy.ts          # Production deployment (Polygon/Amoy)
 │   ├── deploy-test.ts     # Test deployment (Docker integration tests)
-│   ├── verify.ts          # PolygonScan contract verification
-│   ├── check-lockup.ts    # Check lockup status helper
+│   ├── create-lockup-helper.ts # Interactive lockup creation
+│   ├── check-lockup.ts    # Check lockup status
 │   ├── calculate-vested.ts # Calculate vesting timeline
-│   └── create-lockup-helper.ts # Interactive lockup creation
+│   ├── release-helper.ts  # Release vested tokens (beneficiary)
+│   └── revoke-helper.ts   # Revoke lockup (owner only)
 │
 ├── docker/                # Docker integration testing
 │   ├── Dockerfile         # Multi-stage build for node/deploy/tests
@@ -56,11 +57,13 @@ sut-lockup-contract/
 ### Script Directory Organization
 
 **scripts/ (Root Level)**
+
 - **Purpose**: TypeScript scripts for local development and production deployment
 - **Execution**: Direct Hardhat execution (`npx hardhat run scripts/deploy.ts`)
 - **Used by**: `pnpm deploy:polygon`, `pnpm verify:amoy`, local development commands
 
 **docker/scripts/**
+
 - **Purpose**: Shell script wrappers for Docker container execution
 - **Execution**: Inside Docker containers with environment validation and colored output
 - **Used by**: `docker-compose.yml` services (hardhat-deploy, integration-tests)
@@ -80,15 +83,20 @@ pnpm install
 ## Configuration
 
 1. Copy `.env.example` to `.env`:
+
 ```bash
 cp .env.example .env
 ```
 
 2. Configure environment variables:
+
 ```env
 # Required
 PRIVATE_KEY=your_private_key_here
-POLYGONSCAN_API_KEY=your_polygonscan_api_key_here
+
+# Etherscan API V2 - Single key for 60+ chains (Ethereum, Polygon, BSC, etc.)
+# Get your key at: https://etherscan.io/myapikey
+ETHERSCAN_API_KEY=your_etherscan_api_key_here
 
 # Token Address (Required for production deployment)
 # SUT Token on Polygon Mainnet: 0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55
@@ -101,6 +109,7 @@ AMOY_RPC_URL=https://rpc-amoy.polygon.technology
 ```
 
 **Note**:
+
 - `TOKEN_ADDRESS` must be set to the appropriate SUT token address for the target network
 - For testing without real SUT tokens, the deployment script will deploy a MockERC20 if `TOKEN_ADDRESS` is empty
 
@@ -157,25 +166,20 @@ pnpm deploy:polygon
 
 ### Verify Contract on PolygonScan
 
-After deployment, verify your contract:
+After deployment, verify your contract using the command printed by the deployment script:
 
 ```bash
-# Set contract addresses
-export CONTRACT_ADDRESS=<deployed_contract_address>
-export TOKEN_ADDRESS=<token_address>
-
 # Verify on Amoy testnet
-pnpm verify:amoy
+npx hardhat verify --network amoy <CONTRACT_ADDRESS> <TOKEN_ADDRESS>
 
 # Verify on Polygon mainnet
-pnpm verify:polygon
-```
-
-Or use the manual verification command:
-
-```bash
 npx hardhat verify --network polygon <CONTRACT_ADDRESS> <TOKEN_ADDRESS>
+
+# Example (from deployment output):
+npx hardhat verify --network amoy 0xe64dAbdEF5037942853cFC18017dfAB1649D8DF3 0xE4C687167705Abf55d709395f92e254bdF5825a2
 ```
+
+**Note**: The deployment script (`scripts/deploy.ts`) automatically prints the correct verification command with actual addresses. Simply copy and run it.
 
 ## Helper Scripts
 
@@ -195,6 +199,7 @@ npx hardhat run scripts/check-lockup.ts --network polygon
 ```
 
 This displays:
+
 - Total, released, vested, and releasable amounts
 - Vesting progress percentage
 - Timeline (start, cliff end, vesting end)
@@ -214,6 +219,7 @@ npx hardhat run scripts/calculate-vested.ts --network polygon
 ```
 
 This shows:
+
 - Vesting milestones (start, cliff, 25%, 50%, 75%, end)
 - Monthly vesting breakdown
 - Current vesting status and progress
@@ -231,50 +237,115 @@ npx hardhat run scripts/create-lockup-helper.ts --network polygon
 ```
 
 The script will prompt for:
+
 - Beneficiary address
 - Total token amount
-- Cliff duration (in configured time unit)
-- Vesting duration (in configured time unit)
+- Cliff duration (in seconds)
+- Vesting duration (in seconds)
 - Revocable flag
 
 It validates inputs, checks token approval, and guides you through the creation process.
 
-**Quick Testing on Testnet:**
+**Example input for testnet**:
 
-For faster testing on testnet, use the `TIME_UNIT` environment variable:
+- Cliff Duration: `60` (1 minute)
+- Vesting Duration: `6000` (100 minutes)
+
+### Release Vested Tokens
+
+Beneficiary can release vested tokens using the interactive helper:
 
 ```bash
-# Fast testing: 1 minute = 1% vesting (100 minutes = full vesting)
-export TIME_UNIT=minute
+# Set lockup contract address
 export LOCKUP_ADDRESS=<deployed_lockup_contract_address>
-npx hardhat run scripts/create-lockup-helper.ts --network amoy
 
-# Production: 1 month = 1% vesting (100 months = full vesting)
-export TIME_UNIT=month
-npx hardhat run scripts/create-lockup-helper.ts --network polygon
+# Run as beneficiary
+npx hardhat run scripts/release-helper.ts --network polygon
 ```
 
-Supported TIME_UNIT values:
-- `month` - 1 month = 30 days (production, 1% per month)
-- `day` - 1 day (default)
-- `minute` - 1 minute (testnet testing, 1% per minute)
-- `second` - 1 second (rapid testing)
+The script will:
+
+- Show your current lockup status (total, vested, released, releasable)
+- Check if cliff period has passed
+- Estimate gas cost
+- Prompt for confirmation
+- Execute release transaction
+- Display updated status after release
+
+**Features**:
+
+- Automatic validation (cliff period, releasable amount)
+- Gas estimation before transaction
+- Clear status reporting (before and after)
+- Safe: Only works for caller's own lockup
+
+### Revoke a Lockup
+
+Owner can revoke a lockup and reclaim unvested tokens:
+
+```bash
+# Set lockup contract address
+export LOCKUP_ADDRESS=<deployed_lockup_contract_address>
+
+# Run as owner
+npx hardhat run scripts/revoke-helper.ts --network polygon
+```
+
+The script will:
+
+- Verify you are the contract owner
+- Prompt for beneficiary address
+- Show lockup details and revocation impact
+- Calculate refund amount (unvested tokens)
+- Require 2-step confirmation (address + "REVOKE")
+- Execute revoke transaction
+- Display final status
+
+**Important**:
+
+- ⚠️ Revoke is permanent and cannot be undone
+- Only works on revocable lockups (`revocable: true`)
+- Owner receives unvested tokens immediately
+- Beneficiary can still claim vested but unreleased tokens
+- Already released tokens remain with beneficiary
 
 ## Usage
 
+> **⚠️ IMPORTANT: Token Approval Required**
+>
+> Before creating a lockup, the owner MUST approve tokens first:
+>
+> ```typescript
+> // Step 1: Approve tokens (REQUIRED)
+> await sutToken.approve(lockupAddress, amount);
+>
+> // Step 2: Create lockup
+> await tokenLockup.createLockup(...);
+> ```
+>
+> **Using PolygonScan?** Go to the [SUT token contract](https://polygonscan.com/address/0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55#writeContract), approve tokens first, then create the lockup at the TokenLockup contract.
+
 ### Creating a Lockup (Programmatic)
+
+> **⚠️ onlyOwner**: Only the contract owner can call `createLockup()`. If you're the beneficiary, you cannot create your own lockup - the owner must do it for you.
 
 ```typescript
 const lockupContract = await ethers.getContractAt('TokenLockup', lockupAddress);
 
 await lockupContract.createLockup(
-  beneficiaryAddress,      // Address that will receive tokens
+  beneficiaryAddress, // Address that will receive tokens
   ethers.parseEther('1000'), // Total amount to lock
-  30 * 24 * 60 * 60,       // Cliff duration (30 days)
-  365 * 24 * 60 * 60,      // Vesting duration (1 year)
-  true                     // Revocable
+  2592000, // Cliff duration (30 days = 2,592,000 seconds)
+  31536000, // Vesting duration (365 days = 31,536,000 seconds)
+  true // Revocable
 );
 ```
+
+> **Note**: All duration parameters are in **seconds**. Common conversions:
+>
+> - 1 day = 86,400 seconds
+> - 30 days = 2,592,000 seconds
+> - 365 days = 31,536,000 seconds
 
 ### Releasing Vested Tokens
 
@@ -285,10 +356,30 @@ await lockupContract.connect(beneficiary).release();
 
 ### Revoking a Lockup
 
+Owner can revoke a lockup and reclaim unvested tokens:
+
 ```typescript
-// Owner can revoke and reclaim unvested tokens
+// Owner revokes lockup
 await lockupContract.revoke(beneficiaryAddress);
 ```
+
+**Token flow after revoke**:
+
+1. **Unvested tokens** → Immediately transferred to owner
+2. **Vested but unreleased tokens** → Beneficiary can still claim
+3. **Already released tokens** → Irreversible (beneficiary keeps them)
+
+**Example scenario**:
+
+- Total lockup: 100 SUT
+- Current vested: 20.5 SUT
+- Already released: 14.13 SUT
+- **After revoke**:
+  - Owner receives: 100 - 20.5 = **79.5 SUT** (unvested)
+  - Beneficiary keeps: **14.13 SUT** (already released)
+  - Beneficiary can still claim: 20.5 - 14.13 = **6.37 SUT** (vested but not released)
+
+> **⚠️ Warning**: Revoke is permanent and cannot be undone. Only works on lockups created with `revocable: true`.
 
 ## Contract Architecture
 
@@ -331,16 +422,19 @@ pnpm docker:up
 The project uses a multi-stage Dockerfile with three services:
 
 **1. hardhat-node** - Local Hardhat blockchain
+
 - Port: 8545
 - Purpose: Provides deterministic blockchain for testing
 - Lifecycle: Runs continuously until stopped
 
 **2. hardhat-deploy** - Production deployment service
+
 - Purpose: Deploys TokenLockup contract to real networks (Polygon/Amoy)
 - Requires: `TOKEN_ADDRESS` environment variable
 - Usage: `pnpm docker:deploy`
 
 **3. integration-tests** - Integration test runner
+
 - Purpose: Deploys test contracts and runs comprehensive test suite
 - Features: Time acceleration (1 second = 1 month, 100 months = 100 seconds)
 - Tests: 6 integration test suites covering all scenarios
@@ -432,6 +526,7 @@ DEPLOY_NETWORK=localhost
 ### Troubleshooting
 
 **Container fails to start**
+
 ```bash
 # Check Docker daemon is running
 docker ps
@@ -445,6 +540,7 @@ pnpm docker:up
 ```
 
 **Hardhat node not responding**
+
 ```bash
 # Check node health
 curl http://localhost:8545
@@ -455,6 +551,7 @@ pnpm docker:up
 ```
 
 **Tests timeout**
+
 ```bash
 # Increase timeout in docker-compose.yml
 # Edit healthcheck section in docker-compose.yml:
@@ -464,6 +561,7 @@ healthcheck:
 ```
 
 **Port 8545 already in use**
+
 ```bash
 # Find process using port
 lsof -i :8545
@@ -492,6 +590,7 @@ pnpm test:integration
 ## Testing
 
 Test suite covers:
+
 - Contract deployment
 - Lockup creation with various parameters
 - Vesting calculations
@@ -501,6 +600,7 @@ Test suite covers:
 - Full integration testing with time acceleration (Docker)
 
 Run tests with:
+
 ```bash
 # Unit tests only (fast, for development)
 pnpm test
@@ -521,6 +621,65 @@ pnpm docker:up
 - Custom errors instead of revert strings
 - Immutable variables where applicable
 - Efficient storage patterns
+
+## Troubleshooting
+
+### PolygonScan Read Contract Returns "Returned values aren't valid"
+
+**Issue**: Functions like `lockups()`, `vestedAmount()`, `releasableAmount()` fail on PolygonScan UI but work via Hardhat scripts.
+
+**Cause**: PolygonScan RPC node synchronization or browser caching issues.
+
+**Solution**: Use Hardhat scripts instead:
+
+```bash
+export LOCKUP_ADDRESS=<deployed_lockup_contract_address>
+export BENEFICIARY_ADDRESS=<beneficiary_address>
+
+# Check lockup status
+npx hardhat run scripts/check-lockup.ts --network polygon
+
+# Calculate vesting timeline
+npx hardhat run scripts/calculate-vested.ts --network polygon
+```
+
+### PolygonScan Write Contract Doesn't Show Errors
+
+**Issue**: Invalid transactions don't show error messages before submission on PolygonScan UI.
+
+**Cause**: PolygonScan UI doesn't perform pre-validation (staticCall).
+
+**Solution**:
+
+- **Recommended**: Use helper scripts which validate inputs before submission:
+  ```bash
+  npx hardhat run scripts/create-lockup-helper.ts --network polygon
+  ```
+- **For custom frontends**: Use `contract.createLockup.staticCall()` before actual transaction
+- **Check contract state**: Verify token approval and existing lockup status before calling functions
+
+### createLockup Transaction Reverts
+
+**Common causes**:
+
+1. **Missing token approval** (most common):
+
+   ```bash
+   # Solution: Approve tokens first on PolygonScan
+   # Go to SUT token contract → Write Contract → approve(spender, amount)
+   ```
+
+2. **Called with wrong address**:
+   - Error: `OwnableUnauthorizedAccount`
+   - Solution: Must call with owner address, not beneficiary address
+
+3. **Lockup already exists**:
+   - Error: `LockupAlreadyExists`
+   - Solution: Each beneficiary can only have one lockup per contract. Deploy new contract or revoke existing lockup.
+
+4. **Invalid parameters**:
+   - Error: `InvalidDuration` - Check that `cliffDuration <= vestingDuration`
+   - Error: `InvalidAmount` - Check that amount > 0
 
 ## License
 

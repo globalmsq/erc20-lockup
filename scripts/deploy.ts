@@ -97,7 +97,7 @@ async function main() {
   console.log('\n✅ Deployment completed and validated successfully!');
 
   // Verification instructions
-  if (process.env.POLYGONSCAN_API_KEY) {
+  if (process.env.ETHERSCAN_API_KEY) {
     console.log('\n=== Verification Command ===');
     console.log(
       `npx hardhat verify --network ${deploymentInfo.network} ${lockupAddress} ${tokenAddress}`

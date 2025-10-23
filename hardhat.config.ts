@@ -32,10 +32,7 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: {
-      polygon: process.env.POLYGONSCAN_API_KEY || '',
-      polygonAmoy: process.env.POLYGONSCAN_API_KEY || '',
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY || '',
     customChains: [
       {
         network: 'polygonAmoy',

@@ -20,9 +20,7 @@
         "details": "Create TokenLockup.sol inheriting from ReentrancyGuard, Pausable, and Ownable. Define LockupInfo struct with fields: totalAmount, releasedAmount, startTime, cliffDuration, vestingDuration, revocable, revoked. Implement state variables: mapping(address => LockupInfo) public lockups, IERC20 public immutable token. Use SafeERC20 for token operations. Define custom errors: InvalidAmount(), NoTokensAvailable(), NotRevocable(), LockupAlreadyExists(), InvalidBeneficiary(), InvalidDuration(). Implement constructor to set token address and owner",
         "testStrategy": "Unit tests for contract deployment, verify correct inheritance, test struct initialization, validate custom errors are properly defined, check immutable token address is set correctly",
         "priority": "high",
-        "dependencies": [
-          "1"
-        ],
+        "dependencies": ["1"],
         "status": "done",
         "subtasks": [],
         "updatedAt": "2025-10-22T07:29:55.871Z"
@@ -34,9 +32,7 @@
         "details": "Implement createLockup(address beneficiary, uint256 amount, uint256 cliffDuration, uint256 vestingDuration, bool revocable) with onlyOwner modifier. Validate: beneficiary != address(0), amount > 0, vestingDuration >= cliffDuration, no existing lockup for beneficiary. Transfer tokens from owner to contract using safeTransferFrom. Create LockupInfo entry with block.timestamp as startTime. Emit TokensLocked event with all parameters. Consider using MONTH_DURATION constant (30 days) and SAFETY_MARGIN (1 hour) for time calculations",
         "testStrategy": "Test successful lockup creation with various parameters, verify token transfer from owner to contract, test validation for zero address, zero amount, invalid durations, existing lockup rejection, verify event emission with correct parameters",
         "priority": "high",
-        "dependencies": [
-          "2"
-        ],
+        "dependencies": ["2"],
         "status": "done",
         "subtasks": [],
         "updatedAt": "2025-10-22T07:29:55.873Z"
@@ -48,9 +44,7 @@
         "details": "Implement vestedAmount(address beneficiary) function using formula: vestedAmount = (totalAmount × timeFromStart) / vestingDuration. Account for cliff period - return 0 if block.timestamp < startTime + cliffDuration. Cap at totalAmount if fully vested. Implement releasableAmount(address beneficiary) = vestedAmount - releasedAmount. Handle edge cases: revoked lockups, no lockup exists. Use unchecked blocks for gas optimization where overflow impossible. Ensure calculations are timestamp-manipulation resistant using monthly periods",
         "testStrategy": "Test vesting calculations at various time points: before cliff, immediately after cliff, 25%, 50%, 75%, 100% vested. Verify edge cases: revoked lockups return 0, non-existent lockups return 0. Test timestamp safety margins",
         "priority": "high",
-        "dependencies": [
-          "3"
-        ],
+        "dependencies": ["3"],
         "status": "done",
         "subtasks": [],
         "updatedAt": "2025-10-22T07:29:55.874Z"
@@ -62,9 +56,7 @@
         "details": "Implement release() external nonReentrant whenNotPaused function. Calculate releasable amount for msg.sender. Revert with NoTokensAvailable() if amount is 0. Update lockups[msg.sender].releasedAmount. Use safeTransfer to send tokens to beneficiary. Emit TokensReleased event with beneficiary and amount. Implement gas-efficient storage updates. Consider implementing a minimum release amount to prevent dust attacks",
         "testStrategy": "Test successful token release after vesting, verify reentrancy protection, test pause functionality blocks release, verify correct amount calculation and transfer, test multiple releases over time, verify event emission",
         "priority": "high",
-        "dependencies": [
-          "4"
-        ],
+        "dependencies": ["4"],
         "status": "done",
         "subtasks": [],
         "updatedAt": "2025-10-22T07:29:55.875Z"
@@ -76,9 +68,7 @@
         "details": "Implement revoke(address beneficiary) external onlyOwner nonReentrant function. Validate lockup exists and is revocable, not already revoked. Calculate vested amount at revocation time. Set lockups[beneficiary].revoked = true. Calculate refund amount (totalAmount - vestedAmount). If beneficiary has unreleased vested tokens, calculate and keep them available. Transfer refund amount back to owner using safeTransfer. Emit LockupRevoked event with beneficiary and refundAmount",
         "testStrategy": "Test revocation of revocable lockups at various vesting stages, verify non-revocable lockups cannot be revoked, test already revoked lockups cannot be revoked again, verify correct refund calculations, test that vested but unreleased tokens remain claimable",
         "priority": "medium",
-        "dependencies": [
-          "5"
-        ],
+        "dependencies": ["5"],
         "status": "done",
         "subtasks": [],
         "updatedAt": "2025-10-22T07:29:55.876Z"
@@ -90,9 +80,7 @@
         "details": "Implement pause() and unpause() functions with onlyOwner modifier inherited from Pausable. Apply whenNotPaused modifier to release() and partialRelease() functions. Ensure revoke() can still be called when paused (for emergency recovery). Add events for Paused and Unpaused (inherited from Pausable). Document pause scenarios: critical bug discovery, hack attempt detection, abnormal trading patterns",
         "testStrategy": "Test pause blocks release function, verify unpause restores functionality, test revoke still works when paused, verify only owner can pause/unpause, test event emissions",
         "priority": "medium",
-        "dependencies": [
-          "6"
-        ],
+        "dependencies": ["6"],
         "status": "done",
         "subtasks": [],
         "updatedAt": "2025-10-22T07:37:11.423Z"
@@ -104,9 +92,7 @@
         "details": "Implement partialRelease(address beneficiary, uint256 amount) external onlyOwner nonReentrant whenNotPaused. Validate lockup exists and not revoked. Ensure amount <= 10% of totalAmount (recommended limit). Update releasedAmount accordingly. Transfer tokens to beneficiary. Emit PartialTokensReleased event. Consider adding a cooldown period between partial releases. Document use cases: milestone achievements, emergency funding needs",
         "testStrategy": "Test partial release with various amounts, verify 10% limit enforcement, test interaction with normal vesting schedule, verify released amount updates correctly, test event emission",
         "priority": "low",
-        "dependencies": [
-          "5"
-        ],
+        "dependencies": ["5"],
         "status": "cancelled",
         "subtasks": [],
         "updatedAt": "2025-10-22T07:45:14.091Z"
@@ -118,9 +104,7 @@
         "details": "Write tests using Hardhat/Ethers/Chai/TypeChain. Cover: deployment scenarios, lockup creation variations, time-based vesting calculations using time helpers, cliff period behavior, full vesting cycle, revocation at different stages, pause/unpause functionality, partial release scenarios, reentrancy attack simulations, gas consumption analysis with hardhat-gas-reporter. Achieve >95% code coverage. Test error cases: zero amounts, invalid addresses, unauthorized access attempts",
         "testStrategy": "Use coverage tools to ensure >95% coverage, implement fuzzing tests for numerical inputs, test gas consumption stays within acceptable limits, verify all custom errors are tested, use time manipulation helpers for vesting timeline tests",
         "priority": "high",
-        "dependencies": [
-          "8"
-        ],
+        "dependencies": ["8"],
         "status": "done",
         "subtasks": [],
         "updatedAt": "2025-10-22T07:52:42.769Z"
@@ -132,9 +116,7 @@
         "details": "Create deploy scripts for Amoy (scripts/deploy-amoy.ts) and mainnet (scripts/deploy-mainnet.ts). Implement SUT token address configuration: Amoy: 0xE4C687167705Abf55d709395f92e254bdF5825a2, Mainnet: 0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55. Add contract verification scripts using Polygonscan API. Create helper scripts for common operations: checking lockup status, calculating vested amounts. Implement deployment validation: verify token address, check owner permissions, validate initial state. Add scripts to package.json for easy execution",
         "testStrategy": "Test deployment on local Hardhat network first, verify correct token addresses are used per network, test Polygonscan verification works on Amoy, validate deployment gas costs are reasonable, ensure scripts handle errors gracefully",
         "priority": "medium",
-        "dependencies": [
-          "9"
-        ],
+        "dependencies": ["9"],
         "status": "done",
         "subtasks": [],
         "updatedAt": "2025-10-22T10:29:49.930Z"
@@ -146,9 +128,7 @@
         "details": "Remove Docker infrastructure files: delete docker-compose.yml and Dockerfile from project root. Update package.json to remove Docker-related scripts: docker:up, docker:down, docker:logs, docker:deploy. Modify hardhat.config.ts to remove network configurations for 'localhost' and 'docker' networks, keeping only 'hardhat' (for testing), 'amoy', and 'polygon' networks. Update README.md to remove all Docker setup instructions and local deployment references. Update CLAUDE.md to remove Docker commands section and local testing references. Review and update docs/lockup-procedure.md to remove any local deployment steps. Ensure deployment scripts in scripts/ directory only reference Amoy and Polygon mainnet. Remove any references to http://localhost:8545 or http://hardhat-node:8545 from configuration files. Update .env.example to clarify that only Amoy and Polygon deployments are supported",
         "testStrategy": "Verify docker-compose.yml and Dockerfile are deleted from project root. Check package.json no longer contains docker:* scripts. Confirm hardhat.config.ts only has hardhat, amoy, and polygon network configurations. Review all documentation files (README.md, CLAUDE.md, docs/*.md) to ensure no Docker or local deployment references remain. Run 'npm run compile' and 'npm test' to ensure removal doesn't break existing functionality. Attempt deployment to Amoy testnet to confirm deployment still works without local infrastructure",
         "status": "done",
-        "dependencies": [
-          "10"
-        ],
+        "dependencies": ["10"],
         "priority": "medium",
         "subtasks": [],
         "updatedAt": "2025-10-22T12:11:23.462Z"
@@ -160,9 +140,7 @@
         "details": "Create Docker infrastructure with multi-stage Dockerfile supporting three services:\n1. hardhat-node: Local Hardhat chain (port 8545)\n2. hardhat-deploy: Production deployment service (TokenLockup only, supports localhost/polygon/amoy networks, requires TOKEN_ADDRESS)\n3. integration-tests: Test deployment service (MockERC20 + TokenLockup) that runs unit tests + integration tests\n\nImplementation requirements:\n- Single Dockerfile with multi-stage build (base, node, deploy, tests stages)\n- docker-compose.yml orchestrating all three services with health checks and dependencies\n- docker/hardhat.config.integration.ts for integration-tests with single network using RPC_URL environment variable\n- scripts/deploy.ts modified to require TOKEN_ADDRESS and deploy TokenLockup only\n- scripts/deploy-test.ts (NEW) for test deployment with MockERC20 + TokenLockup\n- docker/scripts/deploy.sh for production deployment orchestration\n- docker/scripts/run-integration-tests.sh for test execution (deploy test contracts → unit tests → integration tests)\n- 7 new integration test files in test/integration/:\n  * 01-FullLifecycle.test.ts - Complete vesting lifecycle\n  * 02-PeriodicRelease.test.ts - 1% monthly release (accelerated: 1 sec = 1 month)\n  * 03-RevocationScenarios.test.ts - Revocation at various vesting stages\n  * 04-PauseUnpause.test.ts - Emergency pause functionality\n  * 05-MultipleBeneficiaries.test.ts - Multiple lockup scenarios\n  * 06-EdgeCases.test.ts - Boundary conditions and edge cases\n  * 07-GasEfficiency.test.ts - Gas consumption analysis\n- package.json scripts: docker:build, docker:up, docker:down, docker:logs, test:integration\n- Update README.md with Docker testing instructions\n\nKey design decisions:\n- Use Hardhat deterministic deployment (same private key → same contract addresses)\n- Network name: \"localhost\" for hardhat-deploy, \"integration\" for integration-tests\n- Environment variable: RPC_URL (default: http://localhost:8545)\n- Service separation: production deployment vs test deployment\n- Execution: docker compose up runs everything in one shot (infrastructure + deployment + tests)",
         "testStrategy": "",
         "status": "done",
-        "dependencies": [
-          "11"
-        ],
+        "dependencies": ["11"],
         "priority": "high",
         "subtasks": [
           {
@@ -179,9 +157,7 @@
             "id": 2,
             "title": "Configure docker-compose.yml with three services and dependencies",
             "description": "Create docker-compose.yml orchestrating hardhat-node, hardhat-deploy, and integration-tests services with proper health checks, network configuration, and service dependencies",
-            "dependencies": [
-              1
-            ],
+            "dependencies": [1],
             "details": "Set up docker-compose.yml with: 1) hardhat-node service exposing port 8545 with health check using curl or custom script, 2) hardhat-deploy service depending on hardhat-node being healthy, with TOKEN_ADDRESS env var requirement, 3) integration-tests service depending on hardhat-node, with RPC_URL pointing to hardhat-node. Configure shared network, volumes for contract artifacts, environment variables, restart policies, and proper service ordering. Include .env.docker.example file.",
             "status": "done",
             "testStrategy": "Test service startup order, verify health checks work correctly, validate network connectivity between services, ensure environment variables are properly passed",
@@ -201,9 +177,7 @@
             "id": 4,
             "title": "Modify deploy.ts and create deploy-test.ts scripts",
             "description": "Update existing deployment script to require TOKEN_ADDRESS and create new test deployment script that deploys MockERC20 before TokenLockup for integration testing",
-            "dependencies": [
-              3
-            ],
+            "dependencies": [3],
             "details": "Modify scripts/deploy.ts to: 1) Require TOKEN_ADDRESS environment variable (throw error if missing), 2) Deploy only TokenLockup contract using provided token address, 3) Support localhost/polygon/amoy networks. Create scripts/deploy-test.ts to: 1) Deploy MockERC20 with 1M supply, 2) Deploy TokenLockup with MockERC20 address, 3) Output both contract addresses, 4) Use deterministic deployment for consistent addresses. Both scripts should handle errors gracefully and provide clear console output.",
             "status": "done",
             "testStrategy": "Test production deploy script fails without TOKEN_ADDRESS, verify test deploy script creates both contracts successfully, validate deterministic addresses are consistent",
@@ -213,10 +187,7 @@
             "id": 5,
             "title": "Create Docker orchestration scripts for deployment and testing",
             "description": "Develop shell scripts for production deployment orchestration and integration test execution with proper error handling and logging",
-            "dependencies": [
-              2,
-              4
-            ],
+            "dependencies": [2, 4],
             "details": "Create docker/scripts/deploy.sh for production deployment: 1) Check TOKEN_ADDRESS is set, 2) Wait for hardhat-node health, 3) Run deployment with retries, 4) Output deployment results. Create docker/scripts/run-integration-tests.sh: 1) Deploy test contracts using deploy-test.ts, 2) Export contract addresses as env vars, 3) Run unit tests first, 4) Run integration tests with accelerated time, 5) Generate coverage and gas reports. Both scripts should have proper error handling, colored output, and exit codes.",
             "status": "done",
             "testStrategy": "Test scripts handle missing environment variables correctly, verify retry logic works, validate proper exit codes on success/failure",
@@ -226,9 +197,7 @@
             "id": 6,
             "title": "Implement core integration test files (FullLifecycle, PeriodicRelease, Revocation)",
             "description": "Create the first three critical integration test files covering full vesting lifecycle, periodic 1% monthly releases with accelerated time, and revocation scenarios",
-            "dependencies": [
-              5
-            ],
+            "dependencies": [5],
             "details": "Create test/integration/01-FullLifecycle.test.ts: Complete vesting from creation to 100% release. Create 02-PeriodicRelease.test.ts: Test 1% monthly release using 1 second = 1 month acceleration, verify exact release amounts at each month, test gas costs per release. Create 03-RevocationScenarios.test.ts: Test revocation at 0%, 25%, 50%, 75% vested, verify token recovery, test beneficiary final claims. All tests should use time manipulation helpers and validate events.",
             "status": "done",
             "testStrategy": "Validate time acceleration works correctly (1 sec = 1 month), verify exact percentage calculations, test all edge cases in vesting lifecycle",
@@ -238,9 +207,7 @@
             "id": 7,
             "title": "Implement remaining integration tests (EdgeCases, MultipleBeneficiaries, GasEfficiency)",
             "description": "Create the final integration test files covering edge cases, multiple beneficiary scenarios, and comprehensive gas efficiency analysis",
-            "dependencies": [
-              6
-            ],
+            "dependencies": [6],
             "details": "Create test/integration/04-EdgeCases.test.ts: Test boundary conditions, zero amounts, maximum durations, cliff = vesting edge case. Create 05-MultipleBeneficiaries.test.ts: Deploy multiple TokenLockup contracts, test concurrent vesting schedules, verify isolation between lockups. Create 06-GasEfficiency.test.ts: Measure gas for all operations, compare with theoretical limits, test optimization impact, generate gas report. Include proper test organization and descriptive test names.",
             "status": "done",
             "testStrategy": "Ensure comprehensive edge case coverage, validate gas measurements are accurate, test multiple contract deployments work correctly",
@@ -251,9 +218,7 @@
             "id": 8,
             "title": "Update package.json scripts and README with Docker instructions",
             "description": "Add Docker-related npm scripts to package.json and comprehensive Docker testing documentation to README.md including usage examples and troubleshooting",
-            "dependencies": [
-              7
-            ],
+            "dependencies": [7],
             "details": "Update package.json with scripts: docker:build (builds Docker image), docker:up (starts all services), docker:down (stops and removes containers), docker:logs (shows service logs), docker:test (runs integration tests only), test:integration (runs tests locally). Update README.md with: Docker prerequisites, quick start guide, service architecture explanation, environment variables documentation, troubleshooting common issues, integration test details with time acceleration explanation, example commands and expected outputs.",
             "status": "done",
             "testStrategy": "Verify all npm scripts work correctly, test README instructions are accurate and complete, validate examples produce expected results",
@@ -269,9 +234,7 @@
       "lastModified": "2025-10-22T14:27:24.260Z",
       "taskCount": 12,
       "completedCount": 11,
-      "tags": [
-        "master"
-      ]
+      "tags": ["master"]
     }
   }
 }

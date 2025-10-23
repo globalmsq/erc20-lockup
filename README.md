@@ -19,21 +19,52 @@ Smart contract for managing SUT token lockup with vesting schedules on Polygon.
 
 ```
 sut-lockup-contract/
-├── contracts/           # Solidity contracts
-│   ├── TokenLockup.sol # Main lockup contract
-│   └── MockERC20.sol   # Mock token for testing
-├── scripts/            # Deployment and utility scripts
-│   ├── deploy.ts       # Main deployment script
-│   ├── verify.ts       # Contract verification script
-│   ├── check-lockup.ts # Check lockup status
+├── contracts/              # Solidity contracts
+│   ├── TokenLockup.sol    # Main lockup contract
+│   └── MockERC20.sol      # Mock token for testing
+│
+├── scripts/               # TypeScript scripts (Hardhat direct execution)
+│   ├── deploy.ts          # Production deployment (Polygon/Amoy)
+│   ├── deploy-test.ts     # Test deployment (Docker integration tests)
+│   ├── verify.ts          # PolygonScan contract verification
+│   ├── check-lockup.ts    # Check lockup status helper
 │   ├── calculate-vested.ts # Calculate vesting timeline
 │   └── create-lockup-helper.ts # Interactive lockup creation
-├── test/               # Test suite
-│   └── TokenLockup.test.ts
-└── docs/               # Project documentation
-    ├── prd.md          # Product requirements document
+│
+├── docker/                # Docker integration testing
+│   ├── Dockerfile         # Multi-stage build for node/deploy/tests
+│   ├── hardhat.config.integration.ts # Hardhat config for Docker
+│   └── scripts/           # Shell wrappers (Docker container execution)
+│       ├── deploy.sh      # Deploys contracts inside container
+│       └── run-integration-tests.sh # Runs test suite inside container
+│
+├── test/                  # Test suite
+│   ├── TokenLockup.test.ts # Unit tests (38 tests)
+│   └── integration/       # Integration tests (49 tests)
+│       ├── 01-FullLifecycle.test.ts
+│       ├── 02-PeriodicRelease.test.ts
+│       ├── 03-RevocationScenarios.test.ts
+│       ├── 04-EdgeCases.test.ts
+│       ├── 05-MultipleBeneficiaries.test.ts
+│       └── 06-GasEfficiency.test.ts
+│
+└── docs/                  # Project documentation
+    ├── prd.md             # Product requirements document
     └── lockup-procedure.md # Deployment and usage guide
 ```
+
+### Script Directory Organization
+
+**scripts/ (Root Level)**
+- **Purpose**: TypeScript scripts for local development and production deployment
+- **Execution**: Direct Hardhat execution (`npx hardhat run scripts/deploy.ts`)
+- **Used by**: `pnpm deploy:polygon`, `pnpm verify:amoy`, local development commands
+
+**docker/scripts/**
+- **Purpose**: Shell script wrappers for Docker container execution
+- **Execution**: Inside Docker containers with environment validation and colored output
+- **Used by**: `docker-compose.yml` services (hardhat-deploy, integration-tests)
+- **Function**: Wraps `scripts/*.ts` files with container-specific logic
 
 ## Prerequisites
 
@@ -84,8 +115,11 @@ pnpm compile
 ### Run Tests
 
 ```bash
-# Run all tests
+# Run unit tests only (fast, for development)
 pnpm test
+
+# Run integration tests (local - for debugging)
+pnpm test:integration
 
 # Run with coverage
 pnpm test:coverage
@@ -254,6 +288,186 @@ Main contract implementing token lockup functionality:
 - **Ownable**: Access control for administrative functions
 - **Custom Errors**: Gas-efficient error handling
 
+## Docker Integration Testing
+
+The project includes comprehensive Docker-based integration testing infrastructure for rapid testing of the 1% periodic lockup release mechanism with time acceleration.
+
+### Quick Start
+
+```bash
+# Run complete test suite (one-shot execution)
+pnpm docker:up
+
+# This will:
+# 1. Start local Hardhat node
+# 2. Deploy test contracts (MockERC20 + TokenLockup)
+# 3. Run unit tests
+# 4. Run all integration tests
+```
+
+### Docker Architecture
+
+The project uses a multi-stage Dockerfile with three services:
+
+**1. hardhat-node** - Local Hardhat blockchain
+- Port: 8545
+- Purpose: Provides deterministic blockchain for testing
+- Lifecycle: Runs continuously until stopped
+
+**2. hardhat-deploy** - Production deployment service
+- Purpose: Deploys TokenLockup contract to real networks (Polygon/Amoy)
+- Requires: `TOKEN_ADDRESS` environment variable
+- Usage: `pnpm docker:deploy`
+
+**3. integration-tests** - Integration test runner
+- Purpose: Deploys test contracts and runs comprehensive test suite
+- Features: Time acceleration (1 second = 1 month, 100 months = 100 seconds)
+- Tests: 6 integration test suites covering all scenarios
+
+### Docker Commands
+
+```bash
+# Build Docker images
+pnpm docker:build
+
+# Start all services (recommended - runs everything once)
+pnpm docker:up
+
+# Run integration tests only
+pnpm docker:test
+
+# Run production deployment
+pnpm docker:deploy
+
+# Stop and remove containers
+pnpm docker:down
+
+# View logs from all services
+pnpm docker:logs
+
+# View logs from specific service
+pnpm docker:logs:node    # Hardhat node logs
+pnpm docker:logs:deploy  # Deployment logs
+pnpm docker:logs:tests   # Integration test logs
+```
+
+### Environment Configuration
+
+Create `.env.docker.example` for Docker-specific settings:
+
+```bash
+# Token Address (required for hardhat-deploy service)
+TOKEN_ADDRESS=0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55  # Polygon Mainnet SUT
+
+# Deployment Network (for hardhat-deploy service)
+# Options: localhost, polygon, amoy
+DEPLOY_NETWORK=localhost
+```
+
+### Integration Test Suites
+
+**Time Acceleration**: All integration tests use accelerated time where 1 second = 1 month, allowing 100-month vesting cycles to complete in 100 seconds.
+
+**Test Coverage**:
+
+1. **01-FullLifecycle.test.ts** - Complete vesting lifecycle
+   - Tests 0% → 25% → 50% → 75% → 100% release progression
+   - Validates token balances at each milestone
+   - Verifies over-vesting period behavior
+
+2. **02-PeriodicRelease.test.ts** - 1% monthly releases
+   - Tests exact 1% release for all 100 months
+   - Validates consistent vesting rate
+   - Tests fractional month calculations
+   - Measures gas efficiency over time
+
+3. **03-RevocationScenarios.test.ts** - Revocation at various stages
+   - Tests revocation at 0%, 25%, 50%, 75% vested
+   - Validates refund calculations
+   - Tests beneficiary claims after revocation
+   - Tests non-revocable lockups
+
+4. **04-EdgeCases.test.ts** - Boundary conditions
+   - Minimum/maximum lockup amounts (1 wei to 1M tokens)
+   - Extreme durations (1 second to 120 months)
+   - Cliff edge cases (cliff = vesting, no cliff, 99% cliff)
+   - Invalid operations and error conditions
+   - Time precision and state consistency
+
+5. **05-MultipleBeneficiaries.test.ts** - Multiple concurrent lockups
+   - Separate contract instances for multiple beneficiaries
+   - Independent revocations across contracts
+   - Staggered vesting schedules
+   - Contract isolation verification
+   - Same beneficiary across multiple contracts
+
+6. **06-GasEfficiency.test.ts** - Comprehensive gas analysis
+   - Deployment costs
+   - createLockup, release, revoke gas measurements
+   - Sequential release gas tracking
+   - Operation sequence comparisons
+   - Gas threshold verification
+
+### Troubleshooting
+
+**Container fails to start**
+```bash
+# Check Docker daemon is running
+docker ps
+
+# View detailed logs
+pnpm docker:logs
+
+# Rebuild images
+pnpm docker:build
+pnpm docker:up
+```
+
+**Hardhat node not responding**
+```bash
+# Check node health
+curl http://localhost:8545
+
+# Restart services
+pnpm docker:down
+pnpm docker:up
+```
+
+**Tests timeout**
+```bash
+# Increase timeout in docker-compose.yml
+# Edit healthcheck section in docker-compose.yml:
+healthcheck:
+  start_period: 10s  # Increase from 5s
+  retries: 20        # Increase from 10
+```
+
+**Port 8545 already in use**
+```bash
+# Find process using port
+lsof -i :8545
+
+# Stop existing Hardhat node
+pkill -f hardhat
+
+# Or change port in docker-compose.yml
+```
+
+### Local Testing (Without Docker)
+
+For local testing without Docker, run Hardhat node manually:
+
+```bash
+# Terminal 1: Start Hardhat node
+npx hardhat node
+
+# Terminal 2: Deploy test contracts
+npx hardhat run scripts/deploy-test.ts --network localhost
+
+# Terminal 3: Run integration tests
+pnpm test:integration
+```
+
 ## Testing
 
 Test suite covers:
@@ -263,10 +477,21 @@ Test suite covers:
 - Token release mechanisms
 - Lockup revocation
 - Edge cases and error conditions
+- Full integration testing with time acceleration (Docker)
 
 Run tests with:
 ```bash
+# Unit tests only (fast, for development)
 pnpm test
+
+# Integration tests (local - for debugging)
+pnpm test:integration
+
+# Integration tests (Docker - recommended for CI/CD)
+pnpm docker:test
+
+# Complete test suite with Docker
+pnpm docker:up
 ```
 
 ## Gas Optimization

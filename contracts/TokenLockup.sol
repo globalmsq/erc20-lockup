@@ -103,11 +103,11 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
 
     /**
      * @notice Release vested tokens to beneficiary
+     * @dev Beneficiaries can claim vested tokens even after revocation
      */
     function release() external nonReentrant whenNotPaused {
         LockupInfo storage lockup = lockups[msg.sender];
         if (lockup.totalAmount == 0) revert NoLockupFound();
-        if (lockup.revoked) revert AlreadyRevoked();
 
         uint256 releasable = _releasableAmount(msg.sender);
         if (releasable == 0) revert NoTokensAvailable();
@@ -124,14 +124,16 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      */
     function revoke(address beneficiary) external onlyOwner {
         LockupInfo storage lockup = lockups[beneficiary];
-        if (lockup.totalAmount == 0) revert NoLockupFound();
-        if (!lockup.revocable) revert NotRevocable();
+        if (lockup.startTime == 0) revert NoLockupFound();
         if (lockup.revoked) revert AlreadyRevoked();
+        if (!lockup.revocable) revert NotRevocable();
 
         uint256 vested = _vestedAmount(beneficiary);
         uint256 refund = lockup.totalAmount - vested;
 
         lockup.revoked = true;
+        // Freeze vesting at current amount by updating totalAmount
+        lockup.totalAmount = vested;
 
         if (refund > 0) {
             token.safeTransfer(owner(), refund);
@@ -173,6 +175,11 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
 
         if (lockup.totalAmount == 0) {
             return 0;
+        }
+
+        // If revoked, totalAmount is frozen at revocation time - just return it
+        if (lockup.revoked) {
+            return lockup.totalAmount;
         }
 
         if (block.timestamp < lockup.startTime + lockup.cliffDuration) {

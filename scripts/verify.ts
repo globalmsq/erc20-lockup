@@ -22,8 +22,9 @@ async function main() {
       constructorArguments: [tokenAddress],
     });
     console.log('✅ Contract verified successfully!');
-  } catch (error: any) {
-    if (error.message.toLowerCase().includes('already verified')) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '';
+    if (errorMessage.toLowerCase().includes('already verified')) {
       console.log('✅ Contract already verified!');
     } else {
       console.error('❌ Verification failed:', error);

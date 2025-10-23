@@ -1,0 +1,52 @@
+services:
+  hardhat-node:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: node
+    container_name: sut-hardhat-node
+    ports:
+      - "8545:8545"
+    networks:
+      - hardhat-network
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:8545']
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  hardhat-deploy:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: deploy
+    container_name: sut-hardhat-deploy
+    depends_on:
+      hardhat-node:
+        condition: service_healthy
+    environment:
+      - TOKEN_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+      - DEPLOY_NETWORK=localhost
+    networks:
+      - hardhat-network
+    command: sh docker/scripts/deploy.sh
+
+  integration-tests:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: tests
+    container_name: sut-integration-tests
+    depends_on:
+      hardhat-node:
+        condition: service_healthy
+    environment:
+      - RPC_URL=http://hardhat-node:8545
+    networks:
+      - hardhat-network
+    command: sh docker/scripts/run-integration-tests.sh
+
+networks:
+  hardhat-network:
+    driver: bridge

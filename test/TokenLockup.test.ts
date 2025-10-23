@@ -52,20 +52,27 @@ describe('TokenLockup', function () {
 
   describe('Create Lockup', function () {
     it('Should create a lockup successfully', async function () {
-      await expect(
-        tokenLockup.createLockup(
-          beneficiary.address,
-          TOTAL_AMOUNT,
-          CLIFF_DURATION,
-          VESTING_DURATION,
-          true
-        )
-      )
+      // Execute transaction first
+      const tx = await tokenLockup.createLockup(
+        beneficiary.address,
+        TOTAL_AMOUNT,
+        CLIFF_DURATION,
+        VESTING_DURATION,
+        true
+      );
+      const receipt = await tx.wait();
+
+      // Get actual timestamp from the block where transaction was mined
+      const block = await ethers.provider.getBlock(receipt!.blockNumber!);
+      const actualStartTime = block!.timestamp;
+
+      // Verify event with actual timestamp
+      await expect(tx)
         .to.emit(tokenLockup, 'TokensLocked')
         .withArgs(
           beneficiary.address,
           TOTAL_AMOUNT,
-          await time.latest(),
+          actualStartTime,
           CLIFF_DURATION,
           VESTING_DURATION,
           true
@@ -326,12 +333,31 @@ describe('TokenLockup', function () {
       ).to.be.revertedWithCustomError(tokenLockup, 'OwnableUnauthorizedAccount');
     });
 
-    it('Should prevent release after revoke', async function () {
+    it('Should allow beneficiary to claim vested tokens after revoke', async function () {
+      // Advance past cliff to some point in vesting
+      await time.increase(CLIFF_DURATION + VESTING_DURATION / 2);
+
+      // Revoke lockup (vesting freezes at this point)
       await tokenLockup.revoke(beneficiary.address);
 
+      // Get the actual releasable amount after revoke
+      const releasableAfterRevoke = await tokenLockup.releasableAmount(beneficiary.address);
+      expect(releasableAfterRevoke).to.be.gt(0); // Should have some tokens to release
+
+      // Beneficiary should still be able to claim vested tokens
+      const tx = await tokenLockup.connect(beneficiary).release();
+      await expect(tx).to.emit(tokenLockup, 'TokensReleased');
+
+      const beneficiaryBalance = await token.balanceOf(beneficiary.address);
+
+      // Verify some tokens were vested and claimed (exact amount depends on timing)
+      expect(beneficiaryBalance).to.be.gt(TOTAL_AMOUNT / 4n); // At least 25%
+      expect(beneficiaryBalance).to.be.lt((TOTAL_AMOUNT * 3n) / 4n); // Less than 75%
+
+      // No more tokens should be available after claiming vested amount
       await expect(tokenLockup.connect(beneficiary).release()).to.be.revertedWithCustomError(
         tokenLockup,
-        'AlreadyRevoked'
+        'NoTokensAvailable'
       );
     });
   });

@@ -145,20 +145,130 @@
         "description": "Clean up all Docker-related deployment infrastructure and local chain configurations, keeping only Amoy testnet and Polygon mainnet deployment options",
         "details": "Remove Docker infrastructure files: delete docker-compose.yml and Dockerfile from project root. Update package.json to remove Docker-related scripts: docker:up, docker:down, docker:logs, docker:deploy. Modify hardhat.config.ts to remove network configurations for 'localhost' and 'docker' networks, keeping only 'hardhat' (for testing), 'amoy', and 'polygon' networks. Update README.md to remove all Docker setup instructions and local deployment references. Update CLAUDE.md to remove Docker commands section and local testing references. Review and update docs/lockup-procedure.md to remove any local deployment steps. Ensure deployment scripts in scripts/ directory only reference Amoy and Polygon mainnet. Remove any references to http://localhost:8545 or http://hardhat-node:8545 from configuration files. Update .env.example to clarify that only Amoy and Polygon deployments are supported",
         "testStrategy": "Verify docker-compose.yml and Dockerfile are deleted from project root. Check package.json no longer contains docker:* scripts. Confirm hardhat.config.ts only has hardhat, amoy, and polygon network configurations. Review all documentation files (README.md, CLAUDE.md, docs/*.md) to ensure no Docker or local deployment references remain. Run 'npm run compile' and 'npm test' to ensure removal doesn't break existing functionality. Attempt deployment to Amoy testnet to confirm deployment still works without local infrastructure",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "10"
         ],
         "priority": "medium",
         "subtasks": [],
-        "updatedAt": "2025-10-22T10:33:18.658Z"
+        "updatedAt": "2025-10-22T12:11:23.462Z"
+      },
+      {
+        "id": "12",
+        "title": "Create Docker-based integration testing infrastructure",
+        "description": "Build Docker Compose infrastructure for one-shot integration testing with accelerated vesting times (1 second = 1 month, 100 months = 100 seconds) to test periodic 1% lockup release mechanism",
+        "details": "Create Docker infrastructure with multi-stage Dockerfile supporting three services:\n1. hardhat-node: Local Hardhat chain (port 8545)\n2. hardhat-deploy: Production deployment service (TokenLockup only, supports localhost/polygon/amoy networks, requires TOKEN_ADDRESS)\n3. integration-tests: Test deployment service (MockERC20 + TokenLockup) that runs unit tests + integration tests\n\nImplementation requirements:\n- Single Dockerfile with multi-stage build (base, node, deploy, tests stages)\n- docker-compose.yml orchestrating all three services with health checks and dependencies\n- docker/hardhat.config.integration.ts for integration-tests with single network using RPC_URL environment variable\n- scripts/deploy.ts modified to require TOKEN_ADDRESS and deploy TokenLockup only\n- scripts/deploy-test.ts (NEW) for test deployment with MockERC20 + TokenLockup\n- docker/scripts/deploy.sh for production deployment orchestration\n- docker/scripts/run-integration-tests.sh for test execution (deploy test contracts → unit tests → integration tests)\n- 7 new integration test files in test/integration/:\n  * 01-FullLifecycle.test.ts - Complete vesting lifecycle\n  * 02-PeriodicRelease.test.ts - 1% monthly release (accelerated: 1 sec = 1 month)\n  * 03-RevocationScenarios.test.ts - Revocation at various vesting stages\n  * 04-PauseUnpause.test.ts - Emergency pause functionality\n  * 05-MultipleBeneficiaries.test.ts - Multiple lockup scenarios\n  * 06-EdgeCases.test.ts - Boundary conditions and edge cases\n  * 07-GasEfficiency.test.ts - Gas consumption analysis\n- package.json scripts: docker:build, docker:up, docker:down, docker:logs, test:integration\n- Update README.md with Docker testing instructions\n\nKey design decisions:\n- Use Hardhat deterministic deployment (same private key → same contract addresses)\n- Network name: \"localhost\" for hardhat-deploy, \"integration\" for integration-tests\n- Environment variable: RPC_URL (default: http://localhost:8545)\n- Service separation: production deployment vs test deployment\n- Execution: docker compose up runs everything in one shot (infrastructure + deployment + tests)",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [
+          "11"
+        ],
+        "priority": "high",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create multi-stage Dockerfile with base, node, deploy, and tests stages",
+            "description": "Build a comprehensive multi-stage Dockerfile that supports all three services (hardhat-node, hardhat-deploy, integration-tests) with proper layering and caching optimization",
+            "dependencies": [],
+            "details": "Create docker/Dockerfile with four stages: 1) base stage with Node.js and common dependencies, 2) node stage for Hardhat node service with minimal deps, 3) deploy stage with production deployment requirements, 4) tests stage with full testing dependencies. Each stage should be optimized for caching, use specific Node versions (18-alpine), and include proper WORKDIR, COPY, and RUN commands. Include healthcheck scripts and ensure proper user permissions.",
+            "status": "done",
+            "testStrategy": "Validate each Docker stage builds successfully, test layer caching efficiency, verify all required dependencies are installed in appropriate stages",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Configure docker-compose.yml with three services and dependencies",
+            "description": "Create docker-compose.yml orchestrating hardhat-node, hardhat-deploy, and integration-tests services with proper health checks, network configuration, and service dependencies",
+            "dependencies": [
+              1
+            ],
+            "details": "Set up docker-compose.yml with: 1) hardhat-node service exposing port 8545 with health check using curl or custom script, 2) hardhat-deploy service depending on hardhat-node being healthy, with TOKEN_ADDRESS env var requirement, 3) integration-tests service depending on hardhat-node, with RPC_URL pointing to hardhat-node. Configure shared network, volumes for contract artifacts, environment variables, restart policies, and proper service ordering. Include .env.docker.example file.",
+            "status": "done",
+            "testStrategy": "Test service startup order, verify health checks work correctly, validate network connectivity between services, ensure environment variables are properly passed",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Create hardhat.config.integration.ts for integration test environment",
+            "description": "Develop specialized Hardhat configuration for integration tests using RPC_URL environment variable with single network configuration optimized for Docker environment",
+            "dependencies": [],
+            "details": "Create docker/hardhat.config.integration.ts with: 1) Single network configuration using process.env.RPC_URL || 'http://localhost:8545', 2) Network name 'integration' for test deployment, 3) Deterministic accounts using well-known private keys for reproducible deployments, 4) Compiler settings matching main config, 5) Paths configuration for Docker context, 6) TypeChain and gas reporter settings. Ensure configuration supports both local development and Docker execution.",
+            "status": "done",
+            "testStrategy": "Verify configuration loads correctly in Docker environment, test RPC_URL environment variable usage, validate deterministic account generation",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Modify deploy.ts and create deploy-test.ts scripts",
+            "description": "Update existing deployment script to require TOKEN_ADDRESS and create new test deployment script that deploys MockERC20 before TokenLockup for integration testing",
+            "dependencies": [
+              3
+            ],
+            "details": "Modify scripts/deploy.ts to: 1) Require TOKEN_ADDRESS environment variable (throw error if missing), 2) Deploy only TokenLockup contract using provided token address, 3) Support localhost/polygon/amoy networks. Create scripts/deploy-test.ts to: 1) Deploy MockERC20 with 1M supply, 2) Deploy TokenLockup with MockERC20 address, 3) Output both contract addresses, 4) Use deterministic deployment for consistent addresses. Both scripts should handle errors gracefully and provide clear console output.",
+            "status": "done",
+            "testStrategy": "Test production deploy script fails without TOKEN_ADDRESS, verify test deploy script creates both contracts successfully, validate deterministic addresses are consistent",
+            "parentId": "undefined"
+          },
+          {
+            "id": 5,
+            "title": "Create Docker orchestration scripts for deployment and testing",
+            "description": "Develop shell scripts for production deployment orchestration and integration test execution with proper error handling and logging",
+            "dependencies": [
+              2,
+              4
+            ],
+            "details": "Create docker/scripts/deploy.sh for production deployment: 1) Check TOKEN_ADDRESS is set, 2) Wait for hardhat-node health, 3) Run deployment with retries, 4) Output deployment results. Create docker/scripts/run-integration-tests.sh: 1) Deploy test contracts using deploy-test.ts, 2) Export contract addresses as env vars, 3) Run unit tests first, 4) Run integration tests with accelerated time, 5) Generate coverage and gas reports. Both scripts should have proper error handling, colored output, and exit codes.",
+            "status": "done",
+            "testStrategy": "Test scripts handle missing environment variables correctly, verify retry logic works, validate proper exit codes on success/failure",
+            "parentId": "undefined"
+          },
+          {
+            "id": 6,
+            "title": "Implement core integration test files (FullLifecycle, PeriodicRelease, Revocation)",
+            "description": "Create the first three critical integration test files covering full vesting lifecycle, periodic 1% monthly releases with accelerated time, and revocation scenarios",
+            "dependencies": [
+              5
+            ],
+            "details": "Create test/integration/01-FullLifecycle.test.ts: Complete vesting from creation to 100% release. Create 02-PeriodicRelease.test.ts: Test 1% monthly release using 1 second = 1 month acceleration, verify exact release amounts at each month, test gas costs per release. Create 03-RevocationScenarios.test.ts: Test revocation at 0%, 25%, 50%, 75% vested, verify token recovery, test beneficiary final claims. All tests should use time manipulation helpers and validate events.",
+            "status": "done",
+            "testStrategy": "Validate time acceleration works correctly (1 sec = 1 month), verify exact percentage calculations, test all edge cases in vesting lifecycle",
+            "parentId": "undefined"
+          },
+          {
+            "id": 7,
+            "title": "Implement remaining integration tests (EdgeCases, MultipleBeneficiaries, GasEfficiency)",
+            "description": "Create the final integration test files covering edge cases, multiple beneficiary scenarios, and comprehensive gas efficiency analysis",
+            "dependencies": [
+              6
+            ],
+            "details": "Create test/integration/04-EdgeCases.test.ts: Test boundary conditions, zero amounts, maximum durations, cliff = vesting edge case. Create 05-MultipleBeneficiaries.test.ts: Deploy multiple TokenLockup contracts, test concurrent vesting schedules, verify isolation between lockups. Create 06-GasEfficiency.test.ts: Measure gas for all operations, compare with theoretical limits, test optimization impact, generate gas report. Include proper test organization and descriptive test names.",
+            "status": "done",
+            "testStrategy": "Ensure comprehensive edge case coverage, validate gas measurements are accurate, test multiple contract deployments work correctly",
+            "updatedAt": "2025-10-22T14:25:34.745Z",
+            "parentId": "undefined"
+          },
+          {
+            "id": 8,
+            "title": "Update package.json scripts and README with Docker instructions",
+            "description": "Add Docker-related npm scripts to package.json and comprehensive Docker testing documentation to README.md including usage examples and troubleshooting",
+            "dependencies": [
+              7
+            ],
+            "details": "Update package.json with scripts: docker:build (builds Docker image), docker:up (starts all services), docker:down (stops and removes containers), docker:logs (shows service logs), docker:test (runs integration tests only), test:integration (runs tests locally). Update README.md with: Docker prerequisites, quick start guide, service architecture explanation, environment variables documentation, troubleshooting common issues, integration test details with time acceleration explanation, example commands and expected outputs.",
+            "status": "done",
+            "testStrategy": "Verify all npm scripts work correctly, test README instructions are accurate and complete, validate examples produce expected results",
+            "parentId": "undefined",
+            "updatedAt": "2025-10-22T14:27:24.259Z"
+          }
+        ],
+        "updatedAt": "2025-10-22T14:27:24.259Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-10-22T10:33:18.658Z",
-      "taskCount": 11,
-      "completedCount": 9,
+      "lastModified": "2025-10-22T14:27:24.260Z",
+      "taskCount": 12,
+      "completedCount": 11,
       "tags": [
         "master"
       ]

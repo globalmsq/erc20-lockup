@@ -48,12 +48,7 @@ async function main() {
 
   console.log('📅 Vesting Timeline:');
   console.log('─'.repeat(70));
-  console.log(
-    'Date'.padEnd(25),
-    'Elapsed'.padEnd(15),
-    'Vested %'.padEnd(12),
-    'Vested Amount'
-  );
+  console.log('Date'.padEnd(25), 'Elapsed'.padEnd(15), 'Vested %'.padEnd(12), 'Vested Amount');
   console.log('─'.repeat(70));
 
   // Calculate vesting at different milestones
@@ -141,11 +136,7 @@ async function main() {
   console.log('Current Time:', new Date().toISOString());
   console.log('Vested Amount:', ethers.formatEther(currentVested), 'tokens');
   console.log('Released Amount:', ethers.formatEther(currentReleased), 'tokens');
-  console.log(
-    'Releasable Amount:',
-    ethers.formatEther(currentVested - currentReleased),
-    'tokens'
-  );
+  console.log('Releasable Amount:', ethers.formatEther(currentVested - currentReleased), 'tokens');
 
   if (currentTime < startTime + cliffDuration) {
     const daysUntilCliff = Math.ceil((startTime + cliffDuration - currentTime) / 86400);

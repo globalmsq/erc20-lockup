@@ -170,8 +170,9 @@ async function main() {
     console.log(
       '💡 The beneficiary can call release() to claim vested tokens after the cliff period'
     );
-  } catch (error: any) {
-    console.error('❌ Error creating lockup:', error.message);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('❌ Error creating lockup:', errorMessage);
     throw error;
   } finally {
     rl.close();

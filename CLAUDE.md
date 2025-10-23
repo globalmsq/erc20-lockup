@@ -12,6 +12,40 @@ SUT Token Lockup smart contract for managing token vesting schedules on Polygon.
 - OpenZeppelin contracts (v5.0.0)
 - Polygon (Mainnet + Amoy Testnet)
 
+## Project Structure
+
+### Directory Organization
+
+**scripts/** (Root Level)
+- **Purpose**: TypeScript scripts for local development and production deployment
+- **Execution**: Direct Hardhat execution via `npx hardhat run scripts/*.ts`
+- **Usage**: Local development, Polygon/Amoy production deployment, helper utilities
+- **Files**:
+  - `deploy.ts` - Production deployment (Polygon Mainnet/Amoy Testnet)
+  - `deploy-test.ts` - Test environment deployment (used by Docker integration tests)
+  - `verify.ts` - PolygonScan contract verification
+  - `check-lockup.ts` - Query lockup status and vesting progress
+  - `calculate-vested.ts` - Calculate vesting timeline and milestones
+  - `create-lockup-helper.ts` - Interactive lockup creation with validation
+
+**docker/scripts/**
+- **Purpose**: Shell script wrappers for Docker container execution
+- **Execution**: Inside Docker containers with environment validation and colored output
+- **Usage**: Docker Compose services (`hardhat-deploy`, `integration-tests`)
+- **Function**: Wraps `scripts/*.ts` with container-specific logic (health checks, error handling)
+- **Files**:
+  - `deploy.sh` - Wrapper for `scripts/deploy.ts` (validates TOKEN_ADDRESS, waits for node)
+  - `run-integration-tests.sh` - Deploys test contracts + runs full test suite
+
+**docker/**
+- `Dockerfile` - Multi-stage build (node/deploy/tests targets)
+- `hardhat.config.integration.ts` - Hardhat configuration for Docker network
+- `docker-compose.yml` - Orchestrates hardhat-node, hardhat-deploy, integration-tests
+
+**Key Distinction**:
+- `scripts/*.ts` = Direct Hardhat execution (local/production)
+- `docker/scripts/*.sh` = Container-specific wrappers (Docker only)
+
 ## SUT Token Addresses
 
 **Critical:** This project works with deployed SUT tokens, not deploying new ones.

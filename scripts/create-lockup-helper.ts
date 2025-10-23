@@ -76,13 +76,23 @@ async function main() {
     );
   }
 
-  const cliffDaysStr = await question('Cliff Duration (in days): ');
-  const cliffDays = parseInt(cliffDaysStr);
-  const cliffDuration = cliffDays * 24 * 60 * 60;
+  // Get time unit from environment variable
+  const timeUnit = process.env.TIME_UNIT || 'day';
+  const TIME_MULTIPLIERS: { [key: string]: number } = {
+    month: 30 * 24 * 60 * 60, // 30 days = 2,592,000 seconds
+    day: 24 * 60 * 60, // 86,400 seconds
+    minute: 60, // 60 seconds
+    second: 1, // 1 second
+  };
+  const timeMultiplier = TIME_MULTIPLIERS[timeUnit] || TIME_MULTIPLIERS.day;
 
-  const vestingDaysStr = await question('Total Vesting Duration (in days): ');
-  const vestingDays = parseInt(vestingDaysStr);
-  const vestingDuration = vestingDays * 24 * 60 * 60;
+  const cliffInput = await question(`Cliff Duration (in ${timeUnit}s): `);
+  const cliffPeriods = parseInt(cliffInput);
+  const cliffDuration = cliffPeriods * timeMultiplier;
+
+  const vestingInput = await question(`Total Vesting Duration (in ${timeUnit}s): `);
+  const vestingPeriods = parseInt(vestingInput);
+  const vestingDuration = vestingPeriods * timeMultiplier;
 
   if (vestingDuration <= 0) {
     throw new Error('Vesting duration must be greater than 0');
@@ -100,14 +110,14 @@ async function main() {
   console.log('─'.repeat(50));
   console.log('Beneficiary:', beneficiary);
   console.log('Amount:', ethers.formatEther(amount), 'tokens');
-  console.log('Cliff Duration:', cliffDays, 'days');
-  console.log('Vesting Duration:', vestingDays, 'days');
+  console.log('Cliff Duration:', cliffPeriods, timeUnit + 's');
+  console.log('Vesting Duration:', vestingPeriods, timeUnit + 's');
   console.log('Revocable:', revocable ? 'Yes' : 'No');
   console.log('');
 
   // Calculate vesting rate
-  const dailyVestingRate = (Number(amount) / vestingDays).toFixed(6);
-  console.log('💡 Vesting Rate:', dailyVestingRate, 'tokens per day');
+  const vestingRate = (Number(amount) / vestingPeriods).toFixed(6);
+  console.log('💡 Vesting Rate:', vestingRate, `tokens per ${timeUnit}`);
   console.log('');
 
   const confirm = await question('Proceed with creating this lockup? (yes/no): ');

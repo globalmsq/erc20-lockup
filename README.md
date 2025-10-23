@@ -233,11 +233,32 @@ npx hardhat run scripts/create-lockup-helper.ts --network polygon
 The script will prompt for:
 - Beneficiary address
 - Total token amount
-- Cliff duration (days)
-- Vesting duration (days)
+- Cliff duration (in configured time unit)
+- Vesting duration (in configured time unit)
 - Revocable flag
 
 It validates inputs, checks token approval, and guides you through the creation process.
+
+**Quick Testing on Testnet:**
+
+For faster testing on testnet, use the `TIME_UNIT` environment variable:
+
+```bash
+# Fast testing: 1 minute = 1% vesting (100 minutes = full vesting)
+export TIME_UNIT=minute
+export LOCKUP_ADDRESS=<deployed_lockup_contract_address>
+npx hardhat run scripts/create-lockup-helper.ts --network amoy
+
+# Production: 1 month = 1% vesting (100 months = full vesting)
+export TIME_UNIT=month
+npx hardhat run scripts/create-lockup-helper.ts --network polygon
+```
+
+Supported TIME_UNIT values:
+- `month` - 1 month = 30 days (production, 1% per month)
+- `day` - 1 day (default)
+- `minute` - 1 minute (testnet testing, 1% per minute)
+- `second` - 1 second (rapid testing)
 
 ## Usage
 

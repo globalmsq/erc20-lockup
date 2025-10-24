@@ -16,9 +16,9 @@ describe('Integration: Gas Efficiency Analysis', function () {
   const MONTH = 1; // 1 second = 1 month
   const TOTAL_AMOUNT = ethers.parseEther('100000');
 
-  // Gas thresholds (updated after revocation logic improvements)
+  // Gas thresholds (updated after security improvements)
   const GAS_THRESHOLDS = {
-    createLockup: 175000, // Increased due to revocation support (Docker: 173,504)
+    createLockup: 180000, // Increased due to whenNotPaused modifier + revocation support
     release: 110000, // Increased due to revoked state checks
     revoke: 130000, // Increased due to vesting freeze logic
     vestedAmount: 30000,

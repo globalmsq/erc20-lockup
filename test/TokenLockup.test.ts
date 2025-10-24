@@ -464,7 +464,7 @@ describe('TokenLockup', function () {
       await expect(tokenLockup.connect(beneficiary).release()).to.not.be.reverted;
     });
 
-    it('Should allow revoke to work when paused', async function () {
+    it('Should block revoke when paused', async function () {
       // Create a revocable lockup
       await token.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
       await tokenLockup.createLockup(
@@ -478,8 +478,11 @@ describe('TokenLockup', function () {
       // Pause the contract
       await tokenLockup.pause();
 
-      // Revoke should still work (for emergency recovery)
-      await expect(tokenLockup.revoke(otherAccount.address)).to.not.be.reverted;
+      // Revoke should be blocked when paused (consistent with other state changes)
+      await expect(tokenLockup.revoke(otherAccount.address)).to.be.revertedWithCustomError(
+        tokenLockup,
+        'EnforcedPause'
+      );
     });
 
     it('Should emit Paused event', async function () {
@@ -489,6 +492,107 @@ describe('TokenLockup', function () {
     it('Should emit Unpaused event', async function () {
       await tokenLockup.pause();
       await expect(tokenLockup.unpause()).to.emit(tokenLockup, 'Unpaused').withArgs(owner.address);
+    });
+
+    it('Should block createLockup when paused', async function () {
+      await tokenLockup.pause();
+
+      await token.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
+      await expect(
+        tokenLockup.createLockup(
+          otherAccount.address,
+          TOTAL_AMOUNT,
+          CLIFF_DURATION,
+          VESTING_DURATION,
+          true
+        )
+      ).to.be.revertedWithCustomError(tokenLockup, 'EnforcedPause');
+    });
+  });
+
+  describe('Rounding Error Handling', function () {
+    it('Should release exactly totalAmount after full vesting (no dust)', async function () {
+      // Create lockup with amount that doesn't divide evenly
+      const oddAmount = ethers.parseEther('1000') + 3n; // 1000.000000000000000003
+      await token.approve(await tokenLockup.getAddress(), oddAmount);
+      await tokenLockup.createLockup(beneficiary.address, oddAmount, 0, VESTING_DURATION, false);
+
+      // Advance to end of vesting period
+      await time.increase(VESTING_DURATION);
+
+      // Check releasable amount equals total amount (no rounding loss)
+      const releasable = await tokenLockup.releasableAmount(beneficiary.address);
+      expect(releasable).to.equal(oddAmount);
+
+      // Release all tokens
+      await tokenLockup.connect(beneficiary).release();
+
+      // Verify beneficiary received exactly totalAmount
+      const beneficiaryBalance = await token.balanceOf(beneficiary.address);
+      expect(beneficiaryBalance).to.equal(oddAmount);
+
+      // Verify no dust left in contract
+      const remainingReleasable = await tokenLockup.releasableAmount(beneficiary.address);
+      expect(remainingReleasable).to.equal(0);
+    });
+
+    it('Should handle multiple releases with no accumulated rounding errors', async function () {
+      // Create lockup
+      await token.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
+      await tokenLockup.createLockup(
+        beneficiary.address,
+        TOTAL_AMOUNT,
+        CLIFF_DURATION,
+        VESTING_DURATION,
+        false
+      );
+
+      // Release 1: After cliff
+      await time.increase(CLIFF_DURATION);
+      const releasable1 = await tokenLockup.releasableAmount(beneficiary.address);
+      await tokenLockup.connect(beneficiary).release();
+
+      // Release 2: Midpoint
+      await time.increase((VESTING_DURATION - CLIFF_DURATION) / 2);
+      const releasable2 = await tokenLockup.releasableAmount(beneficiary.address);
+      await tokenLockup.connect(beneficiary).release();
+
+      // Release 3: End of vesting
+      await time.increase((VESTING_DURATION - CLIFF_DURATION) / 2);
+      const releasable3 = await tokenLockup.releasableAmount(beneficiary.address);
+      await tokenLockup.connect(beneficiary).release();
+
+      // Total released should equal totalAmount exactly
+      const totalReleased = releasable1 + releasable2 + releasable3;
+      const beneficiaryBalance = await token.balanceOf(beneficiary.address);
+      expect(beneficiaryBalance).to.equal(TOTAL_AMOUNT);
+      expect(totalReleased).to.be.closeTo(TOTAL_AMOUNT, ethers.parseEther('1')); // Allow small variance during vesting
+    });
+
+    it('Should release remaining dust at final vesting even with odd division', async function () {
+      // Amount that creates significant rounding errors: 1000 / 3 seconds
+      const testAmount = ethers.parseEther('1000');
+      const shortVesting = 3; // 3 seconds - creates 333.33... per second
+      await token.approve(await tokenLockup.getAddress(), testAmount);
+      await tokenLockup.createLockup(beneficiary.address, testAmount, 0, shortVesting, false);
+
+      // Advance to end of vesting period
+      await time.increase(shortVesting);
+
+      // At end of vesting, releasable should be exactly totalAmount (no rounding loss)
+      const releasableAtEnd = await tokenLockup.releasableAmount(beneficiary.address);
+      expect(releasableAtEnd).to.equal(testAmount);
+
+      // Release all tokens
+      await tokenLockup.connect(beneficiary).release();
+      const finalBalance = await token.balanceOf(beneficiary.address);
+
+      // Final balance must be exactly totalAmount (proves no dust left behind)
+      expect(finalBalance).to.equal(testAmount);
+
+      // Verify no tokens stuck in contract
+      const remaining = await tokenLockup.releasableAmount(beneficiary.address);
+      expect(remaining).to.equal(0);
     });
   });
 });

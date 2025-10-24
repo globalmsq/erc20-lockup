@@ -22,15 +22,7 @@
     "check-lockup": "hardhat run scripts/check-lockup.ts",
     "calculate-vested": "hardhat run scripts/calculate-vested.ts",
     "create-lockup": "hardhat run scripts/create-lockup-helper.ts",
-    "docker:build": "docker compose build",
-    "docker:up": "docker compose up",
-    "docker:down": "docker compose down -v",
-    "docker:logs": "docker compose logs -f",
-    "docker:logs:node": "docker compose logs -f hardhat-node",
-    "docker:logs:deploy": "docker compose logs hardhat-deploy",
-    "docker:logs:tests": "docker compose logs integration-tests",
-    "docker:test": "docker compose up integration-tests",
-    "docker:deploy": "docker compose up hardhat-deploy"
+    "docker:test": "docker compose up integration-tests"
   },
   "keywords": [
     "hardhat",

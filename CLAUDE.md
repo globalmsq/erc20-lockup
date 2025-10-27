@@ -186,13 +186,16 @@ See `docs/lockup-procedure.md` for detailed step-by-step guide.
 
 ## Testing Strategy
 
-**Test Coverage:** 29 passing tests covering:
+**Test Coverage:** 50 passing tests covering:
 
 - Deployment validation
 - Lockup creation with various parameters
 - Vesting calculations (before cliff, after cliff, midpoint, full vesting)
 - Token release mechanisms
 - Revocation logic
+- Pause functionality
+- Rounding error handling
+- Token address change feature
 - Error conditions and edge cases
 
 **Run specific test:**
@@ -266,6 +269,30 @@ Contract uses custom errors for gas efficiency. Common errors:
 - `NoTokensAvailable()`: No tokens vested yet or already claimed
 - `NotRevocable()`: Attempting to revoke non-revocable lockup
 - `AlreadyRevoked()`: Lockup already revoked
+- `TokensStillLocked()`: Attempting to change token while contract has balance
+
+### Token Address Change
+
+Change token address when migrating to a new token:
+
+```typescript
+// Step 1: Ensure all lockups are completed (released or revoked)
+const balance = await oldToken.balanceOf(await tokenLockup.getAddress());
+console.log('Contract balance:', balance); // Must be 0
+
+// Step 2: Pause the contract
+await tokenLockup.pause();
+
+// Step 3: Change token address
+await tokenLockup.changeToken(newTokenAddress);
+
+// Step 4: Unpause for normal operations
+await tokenLockup.unpause();
+
+// Step 5: Create new lockups with new token
+await newToken.approve(await tokenLockup.getAddress(), amount);
+await tokenLockup.createLockup(beneficiary, amount, cliff, vesting, revocable);
+```
 
 ## Important Constraints
 
@@ -280,7 +307,10 @@ Contract uses custom errors for gas efficiency. Common errors:
 
 4. **No Partial Release in Current Version:** While PRD mentions partial release, current implementation does NOT include this feature. Only standard vesting + release.
 
-5. **No Emergency Pause in Current Version:** Current implementation does NOT include pausable functionality mentioned in PRD.
+5. **Token Address Change:** Token address can be changed by owner, but ONLY when:
+   - Contract is paused (safety requirement)
+   - Contract token balance is zero (all lockups completed/revoked)
+   - This allows migrating to a new token while ensuring no active lockups exist
 
 ## Documentation
 
@@ -294,11 +324,13 @@ Contract uses:
 
 - IR-based compiler optimization (`viaIR: true`)
 - Custom errors instead of revert strings
-- `immutable` for token address
 - Struct packing in `LockupInfo`
 - `unchecked` blocks where overflow impossible
+- Efficient balance check for token change validation (~36K gas)
 
 Compiler runs optimized for 200 deployment runs (balanced for contract size and execution cost).
+
+**Note:** Token address is no longer `immutable` to support `changeToken()` functionality. This adds minimal gas overhead (~100 gas per read) while enabling critical token migration capability.
 
 ## Task Master AI Instructions
 

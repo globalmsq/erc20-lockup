@@ -25,7 +25,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         bool revoked;
     }
 
-    IERC20 public immutable token;
+    IERC20 public token;
     mapping(address => LockupInfo) public lockups;
 
     event TokensLocked(
@@ -38,6 +38,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     );
     event TokensReleased(address indexed beneficiary, uint256 amount);
     event LockupRevoked(address indexed beneficiary, uint256 refundAmount);
+    event TokenChanged(address indexed oldToken, address indexed newToken);
 
     error InvalidAmount();
     error InvalidDuration();
@@ -48,6 +49,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     error NotRevocable();
     error AlreadyRevoked();
     error InsufficientBalance();
+    error TokensStillLocked();
 
     /**
      * @notice Constructor
@@ -230,5 +232,23 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      */
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /**
+     * @notice Change the token address
+     * @param newToken Address of the new ERC20 token
+     * @dev Only owner can change token address
+     *      Contract must be paused for safety
+     *      Contract must have zero token balance (all lockups completed)
+     * @custom:security Requires paused state and zero balance verification
+     */
+    function changeToken(address newToken) external onlyOwner whenPaused {
+        if (newToken == address(0)) revert InvalidBeneficiary();
+        if (token.balanceOf(address(this)) != 0) revert TokensStillLocked();
+
+        address oldToken = address(token);
+        token = IERC20(newToken);
+
+        emit TokenChanged(oldToken, newToken);
     }
 }

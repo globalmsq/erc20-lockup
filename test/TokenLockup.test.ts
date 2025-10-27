@@ -601,4 +601,87 @@ describe('TokenLockup', function () {
       expect(remaining).to.equal(0);
     });
   });
+
+  describe('Token Address Change', function () {
+    let newToken: MockERC20;
+
+    beforeEach(async function () {
+      // Deploy a new mock token for testing token change
+      const MockERC20Factory = await ethers.getContractFactory('MockERC20');
+      newToken = await MockERC20Factory.deploy('New Token', 'NEW', ethers.parseEther('1000000'));
+      await newToken.waitForDeployment();
+    });
+
+    it('Should revert when contract has non-zero balance', async function () {
+      // Create a lockup so contract has tokens
+      await token.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
+      await tokenLockup.createLockup(beneficiary.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+
+      // Try to change token - should fail
+      await tokenLockup.pause();
+      await expect(
+        tokenLockup.changeToken(await newToken.getAddress())
+      ).to.be.revertedWithCustomError(tokenLockup, 'TokensStillLocked');
+    });
+
+    it('Should revert when called by non-owner', async function () {
+      await tokenLockup.pause();
+      await expect(
+        tokenLockup.connect(otherAccount).changeToken(await newToken.getAddress())
+      ).to.be.revertedWithCustomError(tokenLockup, 'OwnableUnauthorizedAccount');
+    });
+
+    it('Should revert when contract is not paused', async function () {
+      // Contract balance is 0, but not paused
+      await expect(
+        tokenLockup.changeToken(await newToken.getAddress())
+      ).to.be.revertedWithCustomError(tokenLockup, 'ExpectedPause');
+    });
+
+    it('Should revert when new token address is zero', async function () {
+      await tokenLockup.pause();
+      await expect(
+        tokenLockup.changeToken(ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(tokenLockup, 'InvalidBeneficiary');
+    });
+
+    it('Should successfully change token when balance is zero', async function () {
+      // Ensure contract has no tokens
+      const balance = await token.balanceOf(await tokenLockup.getAddress());
+      expect(balance).to.equal(0);
+
+      // Pause and change token
+      await tokenLockup.pause();
+      await tokenLockup.changeToken(await newToken.getAddress());
+
+      // Verify token changed
+      expect(await tokenLockup.token()).to.equal(await newToken.getAddress());
+    });
+
+    it('Should emit TokenChanged event', async function () {
+      await tokenLockup.pause();
+      await expect(tokenLockup.changeToken(await newToken.getAddress()))
+        .to.emit(tokenLockup, 'TokenChanged')
+        .withArgs(await token.getAddress(), await newToken.getAddress());
+    });
+
+    it('Should allow creating lockup with new token after change', async function () {
+      // Change token
+      await tokenLockup.pause();
+      await tokenLockup.changeToken(await newToken.getAddress());
+      await tokenLockup.unpause();
+
+      // Approve and create lockup with new token
+      await newToken.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
+      await tokenLockup.createLockup(beneficiary.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+
+      // Verify lockup created with new token
+      const lockup = await tokenLockup.lockups(beneficiary.address);
+      expect(lockup.totalAmount).to.equal(TOTAL_AMOUNT);
+
+      // Verify new tokens transferred to contract
+      const contractBalance = await newToken.balanceOf(await tokenLockup.getAddress());
+      expect(contractBalance).to.equal(TOTAL_AMOUNT);
+    });
+  });
 });

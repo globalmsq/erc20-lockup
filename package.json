@@ -8,7 +8,9 @@
     "compile": "hardhat compile",
     "test": "hardhat test test/TokenLockup.test.ts",
     "test:coverage": "hardhat coverage",
-    "test:integration": "hardhat test test/integration/**/*.test.ts",
+    "test:integration": "hardhat test test/integration/*.test.ts",
+    "test:all": "pnpm test && pnpm test:integration",
+    "integration-tests": "bash scripts/run-integration-tests.sh",
     "deploy:polygon": "hardhat run scripts/deploy.ts --network polygon",
     "deploy:amoy": "hardhat run scripts/deploy.ts --network amoy",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
@@ -21,8 +23,7 @@
     "verify:amoy": "hardhat verify --network amoy",
     "check-lockup": "hardhat run scripts/check-lockup.ts",
     "calculate-vested": "hardhat run scripts/calculate-vested.ts",
-    "create-lockup": "hardhat run scripts/create-lockup-helper.ts",
-    "docker:test": "docker compose up integration-tests"
+    "create-lockup": "hardhat run scripts/create-lockup-helper.ts"
   },
   "keywords": [
     "hardhat",

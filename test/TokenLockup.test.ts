@@ -202,6 +202,12 @@ describe('TokenLockup', function () {
       const expected = TOTAL_AMOUNT / 2n;
       expect(vested).to.be.closeTo(expected, ethers.parseEther('1'));
     });
+
+    it('Should return zero for non-existent beneficiary', async function () {
+      // Test vestedAmount for address with no lockup (covers early return case)
+      expect(await tokenLockup.vestedAmount(otherAccount.address)).to.equal(0);
+      expect(await tokenLockup.releasableAmount(otherAccount.address)).to.equal(0);
+    });
   });
 
   describe('Release', function () {

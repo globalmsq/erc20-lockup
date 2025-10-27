@@ -18,6 +18,10 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 31337,
     },
+    localhost: {
+      url: 'http://hardhat-node:8545',
+      chainId: 31337,
+    },
     polygon: {
       url: process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com',
       chainId: 137,
@@ -35,7 +39,7 @@ const config: HardhatUserConfig = {
     apiKey: process.env.ETHERSCAN_API_KEY || '',
     customChains: [
       {
-        network: 'polygonAmoy',
+        network: 'amoy',
         chainId: 80002,
         urls: {
           apiURL: 'https://api-amoy.polygonscan.com/api',

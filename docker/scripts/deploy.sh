@@ -11,21 +11,25 @@ echo "${GREEN}========================================${NC}"
 echo "${GREEN}  Production Deployment Script${NC}"
 echo "${GREEN}========================================${NC}"
 
-# Check if TOKEN_ADDRESS is set
-if [ -z "$TOKEN_ADDRESS" ]; then
-    echo "${RED}❌ ERROR: TOKEN_ADDRESS environment variable is required${NC}"
+# Set default network if not specified
+DEPLOY_NETWORK=${DEPLOY_NETWORK:-localhost}
+
+# Check if TOKEN_ADDRESS is set (only required for production networks)
+if [ "$DEPLOY_NETWORK" != "localhost" ] && [ -z "$TOKEN_ADDRESS" ]; then
+    echo "${RED}❌ ERROR: TOKEN_ADDRESS environment variable is required for production deployment${NC}"
     echo "${YELLOW}Set TOKEN_ADDRESS to the SUT token address for your network:${NC}"
     echo "  Polygon Mainnet: 0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55"
     echo "  Amoy Testnet: 0xE4C687167705Abf55d709395f92e254bdF5825a2"
     exit 1
 fi
 
-# Set default network if not specified
-DEPLOY_NETWORK=${DEPLOY_NETWORK:-localhost}
-
 echo "${GREEN}📋 Configuration:${NC}"
 echo "  Network: ${DEPLOY_NETWORK}"
-echo "  Token Address: ${TOKEN_ADDRESS}"
+if [ "$DEPLOY_NETWORK" = "localhost" ]; then
+    echo "  Mode: Test deployment (MockERC20 + TokenLockup)"
+else
+    echo "  Token Address: ${TOKEN_ADDRESS}"
+fi
 echo ""
 
 # Wait for hardhat-node to be ready (if deploying to localhost)
@@ -50,9 +54,14 @@ if [ "$DEPLOY_NETWORK" = "localhost" ]; then
     fi
 fi
 
-# Run deployment
-echo "${GREEN}🚀 Running deployment...${NC}"
-npx hardhat run scripts/deploy.ts --network ${DEPLOY_NETWORK}
+# Run deployment (use deploy-test.ts for localhost, deploy.ts for production)
+if [ "$DEPLOY_NETWORK" = "localhost" ]; then
+    echo "${GREEN}🚀 Running test deployment (MockERC20 + TokenLockup)...${NC}"
+    npx hardhat run scripts/deploy-test.ts --network ${DEPLOY_NETWORK}
+else
+    echo "${GREEN}🚀 Running production deployment...${NC}"
+    npx hardhat run scripts/deploy.ts --network ${DEPLOY_NETWORK}
+fi
 
 EXIT_CODE=$?
 

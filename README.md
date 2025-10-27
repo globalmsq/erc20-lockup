@@ -130,6 +130,9 @@ pnpm test
 # Run integration tests (local - for debugging)
 pnpm test:integration
 
+# Run all tests (unit + integration)
+pnpm test:all
+
 # Run with coverage
 pnpm test:coverage
 
@@ -408,7 +411,7 @@ The project includes comprehensive Docker-based integration testing infrastructu
 
 ```bash
 # Run complete test suite (one-shot execution)
-pnpm docker:up
+docker compose up
 
 # This will:
 # 1. Start local Hardhat node
@@ -419,51 +422,122 @@ pnpm docker:up
 
 ### Docker Architecture
 
-The project uses a multi-stage Dockerfile with three services:
+The project uses a hybrid approach for integration testing:
+
+**Docker Services** (via Docker Compose):
 
 **1. hardhat-node** - Local Hardhat blockchain
 
-- Port: 8545
+- Port: 8545 (exposed to localhost)
 - Purpose: Provides deterministic blockchain for testing
-- Lifecycle: Runs continuously until stopped
+- Lifecycle: Runs in background during tests
 
-**2. hardhat-deploy** - Production deployment service
+**2. hardhat-deploy** - Contract deployment service
 
-- Purpose: Deploys TokenLockup contract to real networks (Polygon/Amoy)
-- Requires: `TOKEN_ADDRESS` environment variable
-- Usage: `pnpm docker:deploy`
+- Purpose: Deploys test contracts (MockERC20 + TokenLockup) to hardhat-node
+- Runs automatically after hardhat-node is healthy
+- Exit after deployment completes
 
-**3. integration-tests** - Integration test runner
+**Local Test Execution**:
 
-- Purpose: Deploys test contracts and runs comprehensive test suite
+**3. Integration Tests** - Run locally via `pnpm test:integration`
+
+- Purpose: Executes comprehensive test suite against Docker services
+- Connection: `http://localhost:8545` (connects to hardhat-node container)
 - Features: Time acceleration (1 second = 1 month, 100 months = 100 seconds)
 - Tests: 6 integration test suites covering all scenarios
+- **Advantages**:
+  - ✅ Instant code changes (no Docker rebuild)
+  - ✅ Fast feedback loop for development
+  - ✅ Easy debugging in local environment
+  - ✅ IDE integration support
 
 ### Docker Commands
 
 ```bash
 # Build Docker images
-pnpm docker:build
+docker compose build
 
 # Start all services (recommended - runs everything once)
-pnpm docker:up
+docker compose up
 
-# Run integration tests only
-pnpm docker:test
+# Run integration tests (with proper exit code handling)
+pnpm integration-tests
 
 # Run production deployment
-pnpm docker:deploy
+docker compose up hardhat-deploy
 
 # Stop and remove containers
-pnpm docker:down
+docker compose down
 
 # View logs from all services
-pnpm docker:logs
+docker compose logs -f
 
 # View logs from specific service
-pnpm docker:logs:node    # Hardhat node logs
-pnpm docker:logs:deploy  # Deployment logs
-pnpm docker:logs:tests   # Integration test logs
+docker compose logs -f hardhat-node     # Hardhat node logs
+docker compose logs -f hardhat-deploy   # Deployment logs
+```
+
+#### Exit Code Handling
+
+When running integration tests, use the shorthand command for proper exit code handling and automatic cleanup:
+
+```bash
+pnpm integration-tests
+```
+
+This command executes `scripts/run-integration-tests.sh` which:
+
+1. **Start Docker services** in background:
+   ```bash
+   docker compose up -d hardhat-node hardhat-deploy
+   ```
+
+2. **Wait for readiness**:
+   - Hardhat node health check (polls `localhost:8545`)
+   - Contract deployment completion
+
+3. **Run tests locally**:
+   ```bash
+   pnpm test:integration
+   ```
+   - Tests connect to `localhost:8545`
+   - Code changes apply immediately (no rebuild)
+
+4. **Capture exit code** from local test execution
+
+5. **Automatic cleanup** - Removes all containers, networks, and volumes:
+   ```bash
+   docker compose down -v
+   ```
+
+6. **Returns test exit code** for CI/CD integration
+
+**Exit codes**:
+- `0`: All tests passed ✅
+- Non-zero: Tests failed ❌
+
+**Benefits**:
+- ✅ **Instant feedback** - No Docker rebuild needed
+- ✅ **Fast development** - Code changes apply immediately
+- ✅ **Clean state** - Full cleanup after every run
+- ✅ **CI/CD-friendly** - Proper exit code handling
+- ✅ **Easy debugging** - Local execution with IDE support
+
+**Example usage with error handling**:
+```bash
+# Run tests and check result
+pnpm integration-tests
+
+if [ $? -eq 0 ]; then
+  echo "✅ All tests passed!"
+else
+  echo "❌ Tests failed!"
+  exit 1
+fi
+
+# Cleanup
+docker compose down -v
 ```
 
 ### Environment Configuration
@@ -532,11 +606,11 @@ DEPLOY_NETWORK=localhost
 docker ps
 
 # View detailed logs
-pnpm docker:logs
+docker compose logs -f
 
 # Rebuild images
-pnpm docker:build
-pnpm docker:up
+docker compose build
+docker compose up
 ```
 
 **Hardhat node not responding**
@@ -546,8 +620,8 @@ pnpm docker:up
 curl http://localhost:8545
 
 # Restart services
-pnpm docker:down
-pnpm docker:up
+docker compose down
+docker compose up
 ```
 
 **Tests timeout**
@@ -608,11 +682,11 @@ pnpm test
 # Integration tests (local - for debugging)
 pnpm test:integration
 
-# Integration tests (Docker - recommended for CI/CD)
-pnpm docker:test
+# Integration tests (Docker - recommended for automation)
+pnpm integration-tests
 
 # Complete test suite with Docker
-pnpm docker:up
+docker compose up
 ```
 
 ## Gas Optimization

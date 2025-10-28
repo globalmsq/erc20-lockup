@@ -139,13 +139,13 @@ vestedAmount = (totalAmount × timeFromStart) / vestingDuration
 
 ```solidity
 struct LockupInfo {
-    uint256 totalAmount;      // Total locked tokens
-    uint256 releasedAmount;   // Already claimed tokens
-    uint256 startTime;        // Lockup start timestamp
-    uint256 cliffDuration;    // Cliff period in seconds
-    uint256 vestingDuration;  // Total vesting period in seconds
-    bool revocable;           // Can owner revoke?
-    bool revoked;             // Has been revoked?
+  uint256 totalAmount; // Total locked tokens
+  uint256 releasedAmount; // Already claimed tokens
+  uint256 startTime; // Lockup start timestamp
+  uint256 cliffDuration; // Cliff period in seconds
+  uint256 vestingDuration; // Total vesting period in seconds
+  bool revocable; // Can owner revoke?
+  bool revoked; // Has been revoked?
 }
 ```
 

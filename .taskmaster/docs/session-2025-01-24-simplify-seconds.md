@@ -19,12 +19,14 @@ This session focused on three main improvements to the SUT Lockup Contract proje
 **Rationale**: Smart contract already uses seconds as the native time unit. The TIME_UNIT environment variable added unnecessary conversion complexity without providing real value.
 
 **Impact**:
+
 - Simplified user input (no mental conversion needed)
 - Reduced potential for errors (fewer conversion steps)
 - Aligned scripts with contract's native time unit
 - Removed 30+ lines of conversion logic
 
 **Files Modified**:
+
 - `scripts/create-lockup-helper.ts` - Removed TIME_UNIT conversion logic
 - `.env.example` - Removed TIME_UNIT variable and documentation
 - `README.md` - Updated all examples to use seconds directly
@@ -32,6 +34,7 @@ This session focused on three main improvements to the SUT Lockup Contract proje
 ### 2. New Helper Scripts
 
 **Release Helper** (`scripts/release-helper.ts`):
+
 - **Purpose**: Beneficiary-facing tool for claiming vested tokens
 - **Key Features**:
   - Automatic validation (cliff period, releasable amount)
@@ -41,6 +44,7 @@ This session focused on three main improvements to the SUT Lockup Contract proje
 - **Usage**: `npx hardhat run scripts/release-helper.ts --network polygon`
 
 **Revoke Helper** (`scripts/revoke-helper.ts`):
+
 - **Purpose**: Owner-facing tool for revoking lockups with safety checks
 - **Key Features**:
   - Owner verification
@@ -53,6 +57,7 @@ This session focused on three main improvements to the SUT Lockup Contract proje
 ### 3. Documentation Improvements
 
 **Added to README.md**:
+
 1. Token approval warning (MUST approve before createLockup)
 2. onlyOwner restriction explanation
 3. revoke() function detailed documentation with token flow example
@@ -68,6 +73,7 @@ This session focused on three main improvements to the SUT Lockup Contract proje
 ### TIME_UNIT Simplification
 
 **Before**:
+
 ```typescript
 const timeUnit = process.env.TIME_UNIT || 'day';
 const TIME_MULTIPLIERS: { [key: string]: number } = {
@@ -84,6 +90,7 @@ const cliffDuration = cliffPeriods * timeMultiplier;
 ```
 
 **After**:
+
 ```typescript
 const cliffInput = await question('Cliff Duration (in seconds): ');
 const cliffDuration = parseInt(cliffInput);
@@ -108,6 +115,7 @@ Both helper scripts follow a consistent pattern:
 ### Code Quality Fixes
 
 **ESLint Error** (release-helper.ts):
+
 ```typescript
 // ❌ Before
 const readline = require('readline');
@@ -117,31 +125,31 @@ import * as readline from 'readline';
 ```
 
 **Prettier Formatting** (revoke-helper.ts):
+
 ```typescript
 // ❌ Before (line too long)
 console.log('💡 Note: Beneficiary can still claim', ethers.formatEther(releasableAmount), 'tokens');
 
 // ✅ After
-console.log(
-  '💡 Note: Beneficiary can still claim',
-  ethers.formatEther(releasableAmount),
-  'tokens'
-);
+console.log('💡 Note: Beneficiary can still claim', ethers.formatEther(releasableAmount), 'tokens');
 ```
 
 ## Files Changed
 
 **Modified** (4 files):
+
 - `scripts/create-lockup-helper.ts` - Removed TIME_UNIT, simplified to seconds
 - `.env.example` - Removed TIME_UNIT variable
 - `README.md` - Added warnings, troubleshooting, helper script docs
 - `package.json` - Updated scripts (if applicable)
 
 **Created** (2 files):
+
 - `scripts/release-helper.ts` - New beneficiary helper script
 - `scripts/revoke-helper.ts` - New owner helper script
 
 **Deleted** (1 file):
+
 - `scripts/verify.ts` - Redundant (functionality in package.json scripts)
 
 **Total**: 16 files changed, +875 insertions, -342 deletions
@@ -149,6 +157,7 @@ console.log(
 ## Testing and Validation
 
 All code quality checks passed:
+
 - ✅ `pnpm lint` - No ESLint errors
 - ✅ `pnpm compile` - Compilation successful with TypeChain types
 - ✅ `pnpm format` - All files formatted correctly
@@ -158,6 +167,7 @@ All code quality checks passed:
 ### Before This Session
 
 **Creating a lockup**:
+
 1. Set TIME_UNIT in .env (confusing for new users)
 2. Calculate duration in chosen unit (mental conversion)
 3. Run create-lockup-helper.ts
@@ -168,18 +178,21 @@ All code quality checks passed:
 ### After This Session
 
 **Creating a lockup**:
+
 1. Calculate duration in seconds (aligns with contract)
 2. Run create-lockup-helper.ts
 3. Clear warning reminds to approve tokens
 4. Script validates and creates lockup
 
 **Releasing tokens**:
+
 1. Run release-helper.ts
 2. Script validates cliff period and releasable amount
 3. Shows gas estimate
 4. Confirms and releases
 
 **Revoking lockup**:
+
 1. Run revoke-helper.ts
 2. Script validates owner, revocable status
 3. Shows refund preview
@@ -197,6 +210,7 @@ All code quality checks passed:
 ## Next Steps (Potential)
 
 Future improvements to consider:
+
 - [ ] Add batch lockup creation script (multiple beneficiaries)
 - [ ] Create admin dashboard script (view all lockups)
 - [ ] Add CSV import/export for lockup data

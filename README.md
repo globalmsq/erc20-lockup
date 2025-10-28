@@ -489,6 +489,7 @@ pnpm integration-tests
 This command executes `scripts/run-integration-tests.sh` which:
 
 1. **Start Docker services** in background:
+
    ```bash
    docker compose up -d hardhat-node hardhat-deploy
    ```
@@ -498,15 +499,18 @@ This command executes `scripts/run-integration-tests.sh` which:
    - Contract deployment completion
 
 3. **Run tests locally**:
+
    ```bash
    pnpm test:integration
    ```
+
    - Tests connect to `localhost:8545`
    - Code changes apply immediately (no rebuild)
 
 4. **Capture exit code** from local test execution
 
 5. **Automatic cleanup** - Removes all containers, networks, and volumes:
+
    ```bash
    docker compose down -v
    ```
@@ -514,10 +518,12 @@ This command executes `scripts/run-integration-tests.sh` which:
 6. **Returns test exit code** for CI/CD integration
 
 **Exit codes**:
+
 - `0`: All tests passed ✅
 - Non-zero: Tests failed ❌
 
 **Benefits**:
+
 - ✅ **Instant feedback** - No Docker rebuild needed
 - ✅ **Fast development** - Code changes apply immediately
 - ✅ **Clean state** - Full cleanup after every run
@@ -525,6 +531,7 @@ This command executes `scripts/run-integration-tests.sh` which:
 - ✅ **Easy debugging** - Local execution with IDE support
 
 **Example usage with error handling**:
+
 ```bash
 # Run tests and check result
 pnpm integration-tests

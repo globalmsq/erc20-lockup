@@ -140,11 +140,11 @@ function revoke(address beneficiary) external onlyOwner
 #### 구현
 
 ```solidity
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 contract TokenLockup is ReentrancyGuard {
-    function release() external nonReentrant { }
-    function revoke(address beneficiary) external onlyOwner nonReentrant { }
+  function release() external nonReentrant {}
+  function revoke(address beneficiary) external onlyOwner nonReentrant {}
 }
 ```
 
@@ -182,17 +182,17 @@ token.safeTransferFrom(msg.sender, address(this), amount);
 #### 구현
 
 ```solidity
-import "@openzeppelin/contracts/utils/Pausable.sol";
+import '@openzeppelin/contracts/utils/Pausable.sol';
 
 function pause() external onlyOwner {
-    _pause();
+  _pause();
 }
 
 function unpause() external onlyOwner {
-    _unpause();
+  _unpause();
 }
 
-function release() external whenNotPaused nonReentrant { }
+function release() external whenNotPaused nonReentrant {}
 ```
 
 #### 사용 시나리오
@@ -293,11 +293,11 @@ uint256 elapsedMonths = (block.timestamp - startTime) / MONTH_DURATION;
 
 ```solidity
 function createLockup(
-    address beneficiary,
-    uint256 amount,
-    uint256 cliffDuration,
-    uint256 vestingDuration,
-    bool revocable
+  address beneficiary,
+  uint256 amount,
+  uint256 cliffDuration,
+  uint256 vestingDuration,
+  bool revocable
 ) external onlyOwner;
 ```
 
@@ -339,13 +339,13 @@ function lockups(address beneficiary) external view returns (LockupInfo);
 
 ```solidity
 struct LockupInfo {
-    uint256 totalAmount;      // 전체 락업 양
-    uint256 releasedAmount;   // 이미 해제된 양
-    uint256 startTime;        // 시작 시간
-    uint256 cliffDuration;    // Cliff 기간
-    uint256 vestingDuration;  // 전체 베스팅 기간
-    bool revocable;           // 취소 가능 여부
-    bool revoked;             // 취소 여부
+  uint256 totalAmount; // 전체 락업 양
+  uint256 releasedAmount; // 이미 해제된 양
+  uint256 startTime; // 시작 시간
+  uint256 cliffDuration; // Cliff 기간
+  uint256 vestingDuration; // 전체 베스팅 기간
+  bool revocable; // 취소 가능 여부
+  bool revoked; // 취소 여부
 }
 ```
 
@@ -355,23 +355,17 @@ struct LockupInfo {
 
 ```solidity
 event TokensLocked(
-    address indexed beneficiary,
-    uint256 amount,
-    uint256 startTime,
-    uint256 cliffDuration,
-    uint256 vestingDuration,
-    bool revocable
+  address indexed beneficiary,
+  uint256 amount,
+  uint256 startTime,
+  uint256 cliffDuration,
+  uint256 vestingDuration,
+  bool revocable
 );
 
-event TokensReleased(
-    address indexed beneficiary,
-    uint256 amount
-);
+event TokensReleased(address indexed beneficiary, uint256 amount);
 
-event LockupRevoked(
-    address indexed beneficiary,
-    uint256 refundAmount
-);
+event LockupRevoked(address indexed beneficiary, uint256 refundAmount);
 ```
 
 ### 4.7 가스 최적화

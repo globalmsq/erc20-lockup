@@ -9,6 +9,7 @@
   "bracketSpacing": true,
   "arrowParens": "always",
   "endOfLine": "lf",
+  "plugins": ["prettier-plugin-solidity"],
   "overrides": [
     {
       "files": "*.sol",
@@ -17,8 +18,7 @@
         "tabWidth": 4,
         "useTabs": false,
         "singleQuote": false,
-        "bracketSpacing": false,
-        "explicitTypes": "always"
+        "bracketSpacing": false
       }
     }
   ]

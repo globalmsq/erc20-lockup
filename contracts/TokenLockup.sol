@@ -93,14 +93,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
 
         token.safeTransferFrom(msg.sender, address(this), amount);
 
-        emit TokensLocked(
-            beneficiary,
-            amount,
-            block.timestamp,
-            cliffDuration,
-            vestingDuration,
-            revocable
-        );
+        emit TokensLocked(beneficiary, amount, block.timestamp, cliffDuration, vestingDuration, revocable);
     }
 
     /**
@@ -179,8 +172,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         uint256 vested = _vestedAmount(beneficiary);
 
         // If fully vested and not revoked, release all remaining tokens (eliminates rounding errors)
-        if (!lockup.revoked &&
-            block.timestamp >= lockup.startTime + lockup.vestingDuration) {
+        if (!lockup.revoked && block.timestamp >= lockup.startTime + lockup.vestingDuration) {
             return lockup.totalAmount - lockup.releasedAmount;
         }
 

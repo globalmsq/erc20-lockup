@@ -12,7 +12,7 @@ describe('Integration: Token Address Change', function () {
   let tokenLockup: TokenLockup;
   let oldToken: MockERC20;
   let newToken: MockERC20;
-  let owner: SignerWithAddress;
+  let _owner: SignerWithAddress;
   let beneficiary1: SignerWithAddress;
   let beneficiary2: SignerWithAddress;
   let otherAccount: SignerWithAddress;
@@ -35,7 +35,7 @@ describe('Integration: Token Address Change', function () {
     const baseTime = await time.latest();
     await time.setNextBlockTimestamp(baseTime + FIXED_TIME_OFFSET);
 
-    [owner, beneficiary1, beneficiary2, otherAccount] = await ethers.getSigners();
+    [_owner, beneficiary1, beneficiary2, otherAccount] = await ethers.getSigners();
 
     // Deploy old token
     const MockERC20Factory = await ethers.getContractFactory('MockERC20');
@@ -60,9 +60,17 @@ describe('Integration: Token Address Change', function () {
 
       // Create lockup with old token
       await oldToken.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
-      await tokenLockup.createLockup(beneficiary1.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+      await tokenLockup.createLockup(
+        beneficiary1.address,
+        TOTAL_AMOUNT,
+        0,
+        VESTING_DURATION,
+        false
+      );
 
-      console.log(`\n  ✅ Created lockup with old token: ${ethers.formatEther(TOTAL_AMOUNT)} tokens`);
+      console.log(
+        `\n  ✅ Created lockup with old token: ${ethers.formatEther(TOTAL_AMOUNT)} tokens`
+      );
 
       // Complete vesting
       await time.increase(VESTING_DURATION);
@@ -92,9 +100,17 @@ describe('Integration: Token Address Change', function () {
 
       // Create new lockup with new token
       await newToken.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
-      await tokenLockup.createLockup(beneficiary2.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+      await tokenLockup.createLockup(
+        beneficiary2.address,
+        TOTAL_AMOUNT,
+        0,
+        VESTING_DURATION,
+        false
+      );
 
-      console.log(`  ✅ Created new lockup with new token: ${ethers.formatEther(TOTAL_AMOUNT)} tokens`);
+      console.log(
+        `  ✅ Created new lockup with new token: ${ethers.formatEther(TOTAL_AMOUNT)} tokens`
+      );
 
       // Verify new lockup works
       await time.increase(VESTING_DURATION);
@@ -122,26 +138,30 @@ describe('Integration: Token Address Change', function () {
 
       // Create lockup
       await oldToken.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
-      await tokenLockup.createLockup(beneficiary1.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+      await tokenLockup.createLockup(
+        beneficiary1.address,
+        TOTAL_AMOUNT,
+        0,
+        VESTING_DURATION,
+        false
+      );
 
       console.log(`  ✅ Created active lockup`);
 
       // Try to change token - should fail
       await tokenLockup.pause();
-      await expect(tokenLockup.changeToken(await newToken.getAddress())).to.be.revertedWithCustomError(
-        tokenLockup,
-        'TokensStillLocked'
-      );
+      await expect(
+        tokenLockup.changeToken(await newToken.getAddress())
+      ).to.be.revertedWithCustomError(tokenLockup, 'TokensStillLocked');
 
       console.log(`  ✅ Correctly rejected: TokensStillLocked`);
     });
 
     it('Should revert when not paused', async function () {
       // Try to change without pausing
-      await expect(tokenLockup.changeToken(await newToken.getAddress())).to.be.revertedWithCustomError(
-        tokenLockup,
-        'ExpectedPause'
-      );
+      await expect(
+        tokenLockup.changeToken(await newToken.getAddress())
+      ).to.be.revertedWithCustomError(tokenLockup, 'ExpectedPause');
 
       console.log('  ✅ Correctly rejected: ExpectedPause');
     });
@@ -174,7 +194,13 @@ describe('Integration: Token Address Change', function () {
 
       // Create two lockups
       await oldToken.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT * 2n);
-      await tokenLockup.createLockup(beneficiary1.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+      await tokenLockup.createLockup(
+        beneficiary1.address,
+        TOTAL_AMOUNT,
+        0,
+        VESTING_DURATION,
+        false
+      );
       await tokenLockup.createLockup(beneficiary2.address, TOTAL_AMOUNT, 0, VESTING_DURATION, true);
 
       console.log('  ✅ Created 2 lockups');
@@ -250,7 +276,13 @@ describe('Integration: Token Address Change', function () {
 
       // Create lockup with new token and complete it
       await newToken.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
-      await tokenLockup.createLockup(beneficiary1.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+      await tokenLockup.createLockup(
+        beneficiary1.address,
+        TOTAL_AMOUNT,
+        0,
+        VESTING_DURATION,
+        false
+      );
       await time.increase(VESTING_DURATION);
       await tokenLockup.connect(beneficiary1).release();
 

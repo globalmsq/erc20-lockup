@@ -640,9 +640,10 @@ describe('TokenLockup', function () {
 
     it('Should revert when new token address is zero', async function () {
       await tokenLockup.pause();
-      await expect(
-        tokenLockup.changeToken(ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(tokenLockup, 'InvalidBeneficiary');
+      await expect(tokenLockup.changeToken(ethers.ZeroAddress)).to.be.revertedWithCustomError(
+        tokenLockup,
+        'InvalidBeneficiary'
+      );
     });
 
     it('Should successfully change token when balance is zero', async function () {

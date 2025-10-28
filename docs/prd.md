@@ -428,13 +428,13 @@ solidity: {
 1. **Amoy 테스트넷 배포**
 
    ```bash
-   pnpm deploy:amoy
+   pnpm deploy:testnet
    ```
 
 2. **컨트랙트 검증**
 
    ```bash
-   pnpm verify:amoy
+   pnpm verify:testnet
    ```
 
 3. **기능 테스트**
@@ -446,12 +446,12 @@ solidity: {
 4. **Mainnet 배포**
 
    ```bash
-   pnpm deploy:polygon
+   pnpm deploy:mainnet
    ```
 
 5. **PolygonScan 검증**
    ```bash
-   pnpm verify:polygon
+   pnpm verify:mainnet
    ```
 
 ### 5.3 검증 요구사항

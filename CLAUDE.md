@@ -77,14 +77,14 @@ pnpm format               # Format code with Prettier
 ### Deployment
 
 ```bash
-pnpm deploy:amoy          # Deploy to Polygon Amoy testnet
-pnpm deploy:polygon       # Deploy to Polygon mainnet
+pnpm deploy:testnet       # Deploy to Polygon Amoy testnet
+pnpm deploy:mainnet       # Deploy to Polygon mainnet
 
 # Verify on PolygonScan
 export CONTRACT_ADDRESS=0x...
 export TOKEN_ADDRESS=0x...
-pnpm verify:amoy          # Verify on Amoy
-pnpm verify:polygon       # Verify on mainnet
+pnpm verify:testnet       # Verify on Amoy
+pnpm verify:mainnet       # Verify on mainnet
 ```
 
 ### Helper Scripts

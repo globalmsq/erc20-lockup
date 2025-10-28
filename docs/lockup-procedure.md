@@ -68,7 +68,7 @@ cat .env | grep TOKEN_ADDRESS
 # TOKEN_ADDRESS=0xE4C687167705Abf55d709395f92e254bdF5825a2
 
 # 배포
-pnpm deploy:amoy
+pnpm deploy:testnet
 ```
 
 **예상 출력:**
@@ -106,7 +106,7 @@ TokenLockup Address: 0xABCD1234...
 TOKEN_ADDRESS=0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55
 
 # 배포
-pnpm deploy:polygon
+pnpm deploy:mainnet
 ```
 
 ### 1.3 컨트랙트 검증
@@ -117,10 +117,10 @@ export CONTRACT_ADDRESS=0xABCD1234...  # TokenLockup 주소
 export TOKEN_ADDRESS=0xE4C687167705Abf55d709395f92e254bdF5825a2
 
 # Amoy 검증
-pnpm verify:amoy
+pnpm verify:testnet
 
 # Mainnet 검증
-pnpm verify:polygon
+pnpm verify:mainnet
 ```
 
 ---

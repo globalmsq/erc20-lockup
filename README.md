@@ -60,7 +60,7 @@ sut-lockup-contract/
 
 - **Purpose**: TypeScript scripts for local development and production deployment
 - **Execution**: Direct Hardhat execution (`npx hardhat run scripts/deploy.ts`)
-- **Used by**: `pnpm deploy:polygon`, `pnpm verify:amoy`, local development commands
+- **Used by**: `pnpm deploy:mainnet`, `pnpm verify:testnet`, local development commands
 
 **docker/scripts/**
 
@@ -158,13 +158,13 @@ pnpm format
 ### Deploy to Polygon Amoy Testnet
 
 ```bash
-pnpm deploy:amoy
+pnpm deploy:testnet
 ```
 
 ### Deploy to Polygon Mainnet
 
 ```bash
-pnpm deploy:polygon
+pnpm deploy:mainnet
 ```
 
 ### Verify Contract on PolygonScan

@@ -23,7 +23,8 @@
     "verify:testnet": "hardhat verify --network amoy",
     "check-lockup": "hardhat run scripts/check-lockup.ts",
     "calculate-vested": "hardhat run scripts/calculate-vested.ts",
-    "create-lockup": "hardhat run scripts/create-lockup-helper.ts"
+    "create-lockup": "hardhat run scripts/create-lockup-helper.ts",
+    "debug-lockup": "hardhat run scripts/debug-lockup.ts"
   },
   "keywords": [
     "hardhat",

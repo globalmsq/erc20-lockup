@@ -104,7 +104,7 @@ async function main() {
   console.log('');
 
   // Calculate vesting rate
-  const vestingRate = (Number(amount) / vestingDuration).toFixed(10);
+  const vestingRate = (Number(ethers.formatEther(amount)) / vestingDuration).toFixed(10);
   console.log('💡 Vesting Rate:', vestingRate, 'tokens per second');
   console.log('');
 

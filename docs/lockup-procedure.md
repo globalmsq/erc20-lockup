@@ -129,7 +129,64 @@ pnpm verify:mainnet
 
 TokenLockup 컨트랙트가 SUT 토큰을 전송할 수 있도록 승인해야 합니다.
 
-### 2.1 Hardhat Console 사용
+> **⚠️ 중요:** Lockup 생성 전 반드시 토큰 승인(approve)이 필요합니다. 승인 없이 `createLockup()`을 호출하면 트랜잭션이 실패합니다.
+
+### 2.1 PolygonScan에서 직접 Approve하기 (권장)
+
+가장 간단한 방법은 PolygonScan UI를 통해 직접 approve하는 것입니다.
+
+#### 단계별 가이드:
+
+1. **SUT 토큰 컨트랙트로 이동**
+   - Polygon Mainnet: https://polygonscan.com/address/0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55#writeContract
+   - Amoy Testnet: https://amoy.polygonscan.com/address/0xE4C687167705Abf55d709395f92e254bdF5825a2#writeContract
+
+2. **지갑 연결**
+   - "Connect to Web3" 버튼 클릭
+   - MetaMask 또는 다른 지갑으로 연결
+   - **주의:** Owner 계정으로 연결해야 합니다
+
+3. **approve 함수 찾기**
+   - "Write Contract" 탭에서 `approve` 함수를 찾습니다
+   - 일반적으로 2번째 또는 3번째 함수입니다
+
+4. **파라미터 입력**
+   ```
+   spender (address): 0xABCD1234...  // TokenLockup 컨트랙트 주소 (Step 1에서 배포한 주소)
+   amount (uint256): 10000000000000000000000  // 승인할 토큰 수량 (wei 단위)
+   ```
+
+   **토큰 수량 계산:**
+   - 10,000 SUT = `10000000000000000000000` (10000 × 10^18)
+   - 1,000 SUT = `1000000000000000000000` (1000 × 10^18)
+   - 100 SUT = `100000000000000000000` (100 × 10^18)
+
+   **팁:** 계산기 사용
+   ```javascript
+   // JavaScript console에서
+   const amount = 10000; // SUT 수량
+   const wei = (amount * 1e18).toLocaleString('fullwide', {useGrouping:false});
+   console.log(wei); // PolygonScan에 입력할 값
+   ```
+
+5. **트랜잭션 실행**
+   - "Write" 버튼 클릭
+   - MetaMask 팝업에서 가스비 확인
+   - "Confirm" 클릭하여 트랜잭션 전송
+   - 트랜잭션 완료 대기 (보통 수 초 소요)
+
+6. **승인 확인**
+   - "Read Contract" 탭으로 이동
+   - `allowance` 함수 찾기
+   - 파라미터 입력:
+     ```
+     owner (address): 0xYourAddress...  // Owner 주소
+     spender (address): 0xABCD1234...  // TokenLockup 주소
+     ```
+   - "Query" 버튼 클릭
+   - 승인된 수량 확인 (예: `10000000000000000000000` = 10,000 SUT)
+
+### 2.2 Hardhat Console 사용
 
 ```bash
 # Amoy 테스트넷
@@ -139,7 +196,7 @@ npx hardhat console --network amoy
 npx hardhat console --network polygon
 ```
 
-### 2.2 Approve 실행
+### 2.3 Approve 실행
 
 ```javascript
 // Hardhat console에서 실행
@@ -170,7 +227,7 @@ const allowance = await sutToken.allowance(owner.address, tokenLockupAddress);
 console.log('Allowance:', ethers.formatEther(allowance));
 ```
 
-### 2.3 스크립트 파일로 실행
+### 2.4 스크립트 파일로 실행
 
 `scripts/approve.ts` 생성:
 
@@ -205,6 +262,21 @@ LOCKUP_ADDRESS=0xABCD1234... npx hardhat run scripts/approve.ts --network amoy
 ---
 
 ## Step 3: Lockup 생성
+
+> **⚠️ 중요 제약사항:**
+>
+> 한 beneficiary 주소는 **평생 단 하나의 lockup만 생성 가능**합니다.
+>
+> - Lockup 완료 또는 취소(revoke) 후에도 같은 주소로 재생성 **불가능**
+> - `lockups[beneficiary]` 매핑 엔트리가 영구적으로 유지됨 (`totalAmount != 0`)
+> - 추가 lockup이 필요한 경우:
+>   - ✅ **다른 지갑 주소 사용** (권장)
+>   - ✅ **새 TokenLockup 컨트랙트 배포**
+> - 이 설계는 감사 추적(audit trail) 보존과 상태 무결성을 위한 것입니다
+>
+> **예시:**
+> - ❌ 잘못된 방법: beneficiary `0x1234...`에게 lockup 생성 → 완료 후 같은 주소로 다시 생성 시도 → `LockupAlreadyExists` 에러
+> - ✅ 올바른 방법: beneficiary `0x1234...`에게 첫 번째 lockup → 추가 lockup 필요 시 `0x5678...` (다른 주소) 사용
 
 ### 3.1 Hardhat Console 사용
 
@@ -500,17 +572,45 @@ if (now < cliffEnd) {
 
 **원인:** 해당 수혜자에 대한 락업이 이미 존재
 
-**해결:**
+**중요:** Lockup을 취소(revoke)하거나 완료한 후에도 같은 beneficiary 주소로는 **재생성이 불가능**합니다. `lockups` 매핑 엔트리가 영구적으로 유지되기 때문입니다.
 
-- 다른 수혜자 주소 사용
-- 기존 락업 취소 후 재생성 (revocable인 경우만 가능)
+**해결 방법:**
 
+1. **다른 지갑 주소 사용 (권장)**
+   ```javascript
+   // 새로운 beneficiary 주소 사용
+   const newBeneficiaryAddress = '0x새주소...';
+   await tokenLockup.createLockup(
+     newBeneficiaryAddress,  // 다른 주소
+     amount,
+     cliffDuration,
+     vestingDuration,
+     revocable
+   );
+   ```
+
+2. **새 TokenLockup 컨트랙트 배포**
+   ```bash
+   # 새 컨트랙트를 배포하여 같은 beneficiary 사용
+   pnpm deploy:testnet  # 또는 deploy:mainnet
+   ```
+
+**❌ 작동하지 않는 방법:**
 ```javascript
-// 기존 락업 취소 (관리자만 가능)
-await tokenLockup.revoke(beneficiaryAddress);
+// ❌ 이 방법은 작동하지 않습니다!
+await tokenLockup.revoke(beneficiaryAddress);  // 취소해도
+await tokenLockup.createLockup(beneficiaryAddress, ...);  // 재생성 불가 - LockupAlreadyExists 에러
 
-// 새 락업 생성
-await tokenLockup.createLockup(...);
+// 이유: revoke 후에도 lockups[beneficiary].totalAmount는 0이 아니므로
+// createLockup의 검증 로직에서 에러 발생
+```
+
+**확인 방법:**
+```javascript
+// 특정 주소에 lockup이 존재하는지 확인
+const lockupInfo = await tokenLockup.lockups(beneficiaryAddress);
+console.log('Total Amount:', ethers.formatEther(lockupInfo.totalAmount));
+// 0이 아니면 이미 lockup이 존재함 (재생성 불가)
 ```
 
 ### 문제 4: 가스비 부족

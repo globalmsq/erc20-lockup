@@ -296,18 +296,26 @@ await tokenLockup.createLockup(beneficiary, amount, cliff, vesting, revocable);
 
 ## Important Constraints
 
-1. **Single Beneficiary:** One lockup per beneficiary address. To change lockup, must revoke (if revocable) and create new one.
+1. **Single Beneficiary per Deployment:** TokenLockup contract supports one beneficiary per deployment. For multiple beneficiaries, deploy multiple contracts.
 
-2. **Immutable Schedule:** Once created, vesting schedule cannot be modified. Only option is revoke + recreate.
+2. **One Lockup per Beneficiary Address (Permanent):** Each beneficiary address can only have **one lockup ever** in a contract instance. Once a lockup is created for a beneficiary:
+   - The lockup **cannot be deleted** or replaced, even after completion or revocation
+   - The `lockups` mapping entry persists permanently with `totalAmount != 0`
+   - **To create additional lockups** for the same beneficiary, you must either:
+     - Use a **different wallet address** for the beneficiary, or
+     - **Deploy a new TokenLockup contract instance**
+   - This design ensures audit trail preservation and prevents state corruption
 
-3. **Token Compatibility:** Only standard ERC20 tokens supported. Does NOT support:
+3. **Immutable Schedule:** Once created, vesting schedule cannot be modified. Only option is revoke + recreate (but see constraint #2 above - cannot recreate for same beneficiary).
+
+4. **Token Compatibility:** Only standard ERC20 tokens supported. Does NOT support:
    - Rebasing tokens
    - Fee-on-transfer tokens
    - Deflationary tokens
 
-4. **No Partial Release in Current Version:** While PRD mentions partial release, current implementation does NOT include this feature. Only standard vesting + release.
+5. **No Partial Release in Current Version:** While PRD mentions partial release, current implementation does NOT include this feature. Only standard vesting + release.
 
-5. **Token Address Change:** Token address can be changed by owner, but ONLY when:
+6. **Token Address Change:** Token address can be changed by owner, but ONLY when:
    - Contract is paused (safety requirement)
    - Contract token balance is zero (all lockups completed/revoked)
    - This allows migrating to a new token while ensuring no active lockups exist

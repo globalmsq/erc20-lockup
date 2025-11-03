@@ -28,6 +28,14 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     IERC20 public token;
     mapping(address => LockupInfo) public lockups;
 
+    // Enumeration support
+    address[] private beneficiaries;
+    mapping(address => uint256) private beneficiaryIndex; // 1-based index (0 = not exists)
+
+    // Constants
+    uint256 public constant MAX_LOCKUPS = 100;
+    uint256 public constant MAX_VESTING_DURATION = 10 * 365 days; // 10 years
+
     event TokensLocked(
         address indexed beneficiary,
         uint256 amount,
@@ -39,10 +47,13 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     event TokensReleased(address indexed beneficiary, uint256 amount);
     event LockupRevoked(address indexed beneficiary, uint256 refundAmount);
     event TokenChanged(address indexed oldToken, address indexed newToken);
+    event LockupDeleted(address indexed beneficiary);
 
     error InvalidAmount();
     error InvalidDuration();
     error InvalidBeneficiary();
+    error InvalidTokenAddress();
+    error SameTokenAddress();
     error LockupAlreadyExists();
     error NoLockupFound();
     error NoTokensAvailable();
@@ -50,13 +61,14 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     error AlreadyRevoked();
     error InsufficientBalance();
     error TokensStillLocked();
+    error MaxLockupsReached();
 
     /**
      * @notice Constructor
      * @param _token Address of the ERC20 token to be locked
      */
     constructor(address _token) Ownable(msg.sender) {
-        if (_token == address(0)) revert InvalidBeneficiary();
+        if (_token == address(0)) revert InvalidTokenAddress();
         token = IERC20(_token);
     }
 
@@ -78,8 +90,10 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         if (beneficiary == address(0)) revert InvalidBeneficiary();
         if (amount == 0) revert InvalidAmount();
         if (vestingDuration == 0) revert InvalidDuration();
+        if (vestingDuration > MAX_VESTING_DURATION) revert InvalidDuration();
         if (cliffDuration > vestingDuration) revert InvalidDuration();
         if (lockups[beneficiary].totalAmount != 0) revert LockupAlreadyExists();
+        if (beneficiaries.length >= MAX_LOCKUPS) revert MaxLockupsReached();
 
         lockups[beneficiary] = LockupInfo({
             totalAmount: amount,
@@ -90,6 +104,10 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
             revocable: revocable,
             revoked: false
         });
+
+        // Add to beneficiaries array
+        beneficiaries.push(beneficiary);
+        beneficiaryIndex[beneficiary] = beneficiaries.length; // 1-based index
 
         token.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -122,8 +140,9 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      * @dev Freezes vesting at current amount. Beneficiary can still claim vested tokens.
      *      Sets vestingDuration to 0 as additional safety measure.
      * @custom:security Only revocable lockups can be revoked. Cannot be revoked twice.
+     *      Protected by ReentrancyGuard for defense-in-depth.
      */
-    function revoke(address beneficiary) external onlyOwner whenNotPaused {
+    function revoke(address beneficiary) external onlyOwner whenNotPaused nonReentrant {
         LockupInfo storage lockup = lockups[beneficiary];
         if (lockup.startTime == 0) revert NoLockupFound();
         if (lockup.revoked) revert AlreadyRevoked();
@@ -235,12 +254,131 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      * @custom:security Requires paused state and zero balance verification
      */
     function changeToken(address newToken) external onlyOwner whenPaused {
-        if (newToken == address(0)) revert InvalidBeneficiary();
-        if (token.balanceOf(address(this)) != 0) revert TokensStillLocked();
+        if (newToken == address(0)) revert InvalidTokenAddress();
 
         address oldToken = address(token);
+        if (newToken == oldToken) revert SameTokenAddress();
+        if (token.balanceOf(address(this)) != 0) revert TokensStillLocked();
+
         token = IERC20(newToken);
 
         emit TokenChanged(oldToken, newToken);
+    }
+
+    /**
+     * @notice Delete a completed lockup to allow address reuse
+     * @param beneficiary Address of the beneficiary whose lockup to delete
+     * @dev Only callable when all tokens have been released or revoked and claimed
+     * @custom:security Only owner can delete. Lockup must be fully completed.
+     */
+    function deleteLockup(address beneficiary) external onlyOwner {
+        LockupInfo storage lockup = lockups[beneficiary];
+        if (lockup.totalAmount == 0) revert NoLockupFound();
+
+        // Ensure lockup is fully completed (all tokens released)
+        if (lockup.releasedAmount != lockup.totalAmount) revert TokensStillLocked();
+
+        // Remove from beneficiaries array using swap and pop
+        uint256 index = beneficiaryIndex[beneficiary] - 1; // Convert to 0-based
+        uint256 lastIndex = beneficiaries.length - 1;
+
+        // Security: Validate index bounds and synchronization
+        if (index > lastIndex) revert InvalidBeneficiary();
+        if (beneficiaries[index] != beneficiary) revert InvalidBeneficiary();
+
+        if (index != lastIndex) {
+            address lastBeneficiary = beneficiaries[lastIndex];
+            beneficiaries[index] = lastBeneficiary;
+            beneficiaryIndex[lastBeneficiary] = index + 1; // Update to 1-based
+        }
+
+        beneficiaries.pop();
+        delete beneficiaryIndex[beneficiary];
+        delete lockups[beneficiary];
+
+        emit LockupDeleted(beneficiary);
+    }
+
+    /**
+     * @notice Get the total number of active lockups
+     * @return Number of beneficiaries with active lockups
+     */
+    function getLockupCount() external view returns (uint256) {
+        return beneficiaries.length;
+    }
+
+    /**
+     * @notice Get all beneficiary addresses
+     * @return Array of all beneficiary addresses
+     */
+    function getAllBeneficiaries() external view returns (address[] memory) {
+        return beneficiaries;
+    }
+
+    /**
+     * @notice Get all lockups information
+     * @return addresses Array of beneficiary addresses
+     * @return lockupInfos Array of corresponding lockup information
+     *
+     * @dev View function - free to call externally, but consumes gas if called internally
+     *
+     * @custom:gas-warning Gas cost scales with number of lockups:
+     *   - 10 lockups: ~50,000 gas
+     *   - 50 lockups: ~250,000 gas
+     *   - 100 lockups: ~500,000 gas
+     *
+     * @custom:recommendation For production integrations with many lockups,
+     *   use getLockupsPaginated() to avoid potential gas limit issues.
+     *   Block gas limit on Polygon: 30,000,000 gas
+     */
+    function getAllLockups() external view returns (address[] memory addresses, LockupInfo[] memory lockupInfos) {
+        uint256 count = beneficiaries.length;
+        addresses = new address[](count);
+        lockupInfos = new LockupInfo[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            addresses[i] = beneficiaries[i];
+            lockupInfos[i] = lockups[beneficiaries[i]];
+        }
+
+        return (addresses, lockupInfos);
+    }
+
+    /**
+     * @notice Get lockups information with pagination
+     * @param offset Starting index (0-based)
+     * @param limit Maximum number of results to return
+     * @return addresses Array of beneficiary addresses
+     * @return lockupInfos Array of corresponding lockup information
+     * @dev Use this function to avoid gas limit issues with large numbers of lockups
+     */
+    function getLockupsPaginated(
+        uint256 offset,
+        uint256 limit
+    ) external view returns (address[] memory addresses, LockupInfo[] memory lockupInfos) {
+        uint256 count = beneficiaries.length;
+
+        if (offset >= count) {
+            return (new address[](0), new LockupInfo[](0));
+        }
+
+        // Security: Prevent overflow in pagination calculation
+        if (limit > type(uint256).max - offset) revert InvalidAmount();
+
+        uint256 end = offset + limit;
+        if (end > count) {
+            end = count;
+        }
+
+        uint256 resultCount = end - offset;
+        addresses = new address[](resultCount);
+        lockupInfos = new LockupInfo[](resultCount);
+
+        for (uint256 i = 0; i < resultCount; i++) {
+            addresses[i] = beneficiaries[offset + i];
+            lockupInfos[i] = lockups[beneficiaries[offset + i]];
+        }
+
+        return (addresses, lockupInfos);
     }
 }

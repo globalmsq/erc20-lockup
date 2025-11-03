@@ -181,10 +181,10 @@ describe('Integration: Token Address Change', function () {
 
       await expect(tokenLockup.changeToken(ethers.ZeroAddress)).to.be.revertedWithCustomError(
         tokenLockup,
-        'InvalidBeneficiary'
+        'InvalidTokenAddress'
       );
 
-      console.log('  ✅ Correctly rejected: InvalidBeneficiary (zero address)');
+      console.log('  ✅ Correctly rejected: InvalidTokenAddress (zero address)');
     });
   });
 

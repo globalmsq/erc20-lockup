@@ -124,10 +124,10 @@ pnpm compile
 ### Run Tests
 
 ```bash
-# Run unit tests only (fast, for development)
+# Run unit tests only (fast, located in test/TokenLockup.test.ts)
 pnpm test
 
-# Run integration tests (local - for debugging)
+# Run integration tests only (slower, located in test/integration/*.test.ts)
 pnpm test:integration
 
 # Run all tests (unit + integration)

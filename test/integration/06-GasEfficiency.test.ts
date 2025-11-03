@@ -18,7 +18,7 @@ describe('Integration: Gas Efficiency Analysis', function () {
 
   // Gas thresholds (updated after security improvements)
   const GAS_THRESHOLDS = {
-    createLockup: 180000, // Increased due to whenNotPaused modifier + revocation support
+    createLockup: 245000, // Increased due to beneficiary array management (max ~243K in Docker environment)
     release: 110000, // Increased due to revoked state checks
     revoke: 130000, // Increased due to vesting freeze logic
     vestedAmount: 30000,

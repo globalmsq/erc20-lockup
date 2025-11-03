@@ -45,7 +45,7 @@ describe('TokenLockup', function () {
       const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
       await expect(TokenLockupFactory.deploy(ethers.ZeroAddress)).to.be.revertedWithCustomError(
         tokenLockup,
-        'InvalidBeneficiary'
+        'InvalidTokenAddress'
       );
     });
   });
@@ -642,7 +642,7 @@ describe('TokenLockup', function () {
       await tokenLockup.pause();
       await expect(tokenLockup.changeToken(ethers.ZeroAddress)).to.be.revertedWithCustomError(
         tokenLockup,
-        'InvalidBeneficiary'
+        'InvalidTokenAddress'
       );
     });
 

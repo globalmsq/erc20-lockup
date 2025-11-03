@@ -151,6 +151,7 @@ TokenLockup 컨트랙트가 SUT 토큰을 전송할 수 있도록 승인해야 �
    - 일반적으로 2번째 또는 3번째 함수입니다
 
 4. **파라미터 입력**
+
    ```
    spender (address): 0xABCD1234...  // TokenLockup 컨트랙트 주소 (Step 1에서 배포한 주소)
    amount (uint256): 10000000000000000000000  // 승인할 토큰 수량 (wei 단위)
@@ -162,10 +163,11 @@ TokenLockup 컨트랙트가 SUT 토큰을 전송할 수 있도록 승인해야 �
    - 100 SUT = `100000000000000000000` (100 × 10^18)
 
    **팁:** 계산기 사용
+
    ```javascript
    // JavaScript console에서
    const amount = 10000; // SUT 수량
-   const wei = (amount * 1e18).toLocaleString('fullwide', {useGrouping:false});
+   const wei = (amount * 1e18).toLocaleString('fullwide', { useGrouping: false });
    console.log(wei); // PolygonScan에 입력할 값
    ```
 
@@ -275,6 +277,7 @@ LOCKUP_ADDRESS=0xABCD1234... npx hardhat run scripts/approve.ts --network amoy
 > - 이 설계는 감사 추적(audit trail) 보존과 상태 무결성을 위한 것입니다
 >
 > **예시:**
+>
 > - ❌ 잘못된 방법: beneficiary `0x1234...`에게 lockup 생성 → 완료 후 같은 주소로 다시 생성 시도 → `LockupAlreadyExists` 에러
 > - ✅ 올바른 방법: beneficiary `0x1234...`에게 첫 번째 lockup → 추가 lockup 필요 시 `0x5678...` (다른 주소) 사용
 
@@ -577,11 +580,12 @@ if (now < cliffEnd) {
 **해결 방법:**
 
 1. **다른 지갑 주소 사용 (권장)**
+
    ```javascript
    // 새로운 beneficiary 주소 사용
    const newBeneficiaryAddress = '0x새주소...';
    await tokenLockup.createLockup(
-     newBeneficiaryAddress,  // 다른 주소
+     newBeneficiaryAddress, // 다른 주소
      amount,
      cliffDuration,
      vestingDuration,
@@ -596,6 +600,7 @@ if (now < cliffEnd) {
    ```
 
 **❌ 작동하지 않는 방법:**
+
 ```javascript
 // ❌ 이 방법은 작동하지 않습니다!
 await tokenLockup.revoke(beneficiaryAddress);  // 취소해도
@@ -606,6 +611,7 @@ await tokenLockup.createLockup(beneficiaryAddress, ...);  // 재생성 불가 - 
 ```
 
 **확인 방법:**
+
 ```javascript
 // 특정 주소에 lockup이 존재하는지 확인
 const lockupInfo = await tokenLockup.lockups(beneficiaryAddress);

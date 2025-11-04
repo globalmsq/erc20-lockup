@@ -251,8 +251,9 @@ describe('Integration: Periodic 1% Monthly Release', function () {
       const variancePercent = (variance / avgGas) * 100;
       console.log(`  Variance: ${variance.toLocaleString()} (${variancePercent.toFixed(1)}%)`);
 
-      // Gas should be reasonable (less than 100k for a release)
-      expect(maxGas).to.be.lessThan(100000);
+      // Gas should be reasonable (less than 102k for a release)
+      // Note: +~2K from emergency unlock cancellation check (enhancement #15)
+      expect(maxGas).to.be.lessThan(102000);
     });
   });
 });

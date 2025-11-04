@@ -188,9 +188,24 @@ Recent security improvements based on comprehensive audit (Grade: A-):
    - Deployment gas increase: ~18-22K gas (from ~1,244K to ~1,262K)
    - **Recovery:** No recovery mechanism needed - deployment fails immediately with clear error
 
-All improvements maintain gas efficiency while significantly enhancing security posture. Full test coverage: 60 unit/validation tests + 60 integration tests passing.
+9. **Explicit Vested Amount Storage on Revocation** (contracts/TokenLockup.sol:173-174, 232-233)
+   - Added `vestedAtRevoke` field to `LockupInfo` struct to explicitly store vested amount at revocation time
+   - Modified `revoke()` to store `vestedAtRevoke` when lockup is revoked
+   - Modified `_vestedAmount()` to return stored `vestedAtRevoke` for revoked lockups instead of recalculating
+   - **Benefits:** Improves transparency and auditability, prevents any ambiguity about frozen vesting amount
+   - Original `totalAmount` and `vestingDuration` preserved for historical reference
+   - Gas cost increase on revoke: ~18K gas (from ~61K to ~79K), acceptable for improved clarity
 
-**Security Grade: A** (upgraded from A-)
+10. **Active Lockup Prevention in Token Change** (contracts/TokenLockup.sol:279-280)
+    - Added `ActiveLockupsExist()` custom error for clear semantics
+    - Added `beneficiaries.length > 0` check in `changeToken()` to prevent token changes with active lockups
+    - Requires calling `deleteLockup()` for all completed lockups before token migration
+    - **Benefits:** Prevents data inconsistency, ensures clean migration state, explicit operational requirement
+    - Works with existing zero-balance check to provide comprehensive safety
+
+All improvements maintain gas efficiency while significantly enhancing security posture. Full test coverage: 55 unit tests + 60 integration tests passing.
+
+**Security Grade: A**
 
 ### Lockup Enumeration
 
@@ -251,6 +266,7 @@ struct LockupInfo {
   uint256 vestingDuration; // Total vesting period in seconds
   bool revocable; // Can owner revoke?
   bool revoked; // Has been revoked?
+  uint256 vestedAtRevoke; // Amount vested at revocation time (0 if not revoked)
 }
 ```
 
@@ -375,6 +391,7 @@ Contract uses custom errors for gas efficiency. Common errors:
 - `NotRevocable()`: Attempting to revoke non-revocable lockup
 - `AlreadyRevoked()`: Lockup already revoked
 - `TokensStillLocked()`: Attempting to change token while contract has balance
+- `ActiveLockupsExist()`: Attempting to change token while active lockups exist (even with zero balance)
 
 ### Token Address Change
 
@@ -385,16 +402,23 @@ Change token address when migrating to a new token:
 const balance = await oldToken.balanceOf(await tokenLockup.getAddress());
 console.log('Contract balance:', balance); // Must be 0
 
-// Step 2: Pause the contract
+// Step 2: Delete all completed lockups to clear beneficiaries array
+const beneficiaries = await tokenLockup.getAllBeneficiaries();
+for (const beneficiary of beneficiaries) {
+  await tokenLockup.deleteLockup(beneficiary);
+}
+console.log('Active lockups:', await tokenLockup.getLockupCount()); // Must be 0
+
+// Step 3: Pause the contract
 await tokenLockup.pause();
 
-// Step 3: Change token address
+// Step 4: Change token address
 await tokenLockup.changeToken(newTokenAddress);
 
-// Step 4: Unpause for normal operations
+// Step 5: Unpause for normal operations
 await tokenLockup.unpause();
 
-// Step 5: Create new lockups with new token
+// Step 6: Create new lockups with new token
 await newToken.approve(await tokenLockup.getAddress(), amount);
 await tokenLockup.createLockup(beneficiary, amount, cliff, vesting, revocable);
 ```
@@ -439,7 +463,9 @@ await tokenLockup.createLockup(beneficiary, amount, cliff, vesting, revocable);
 7. **Token Address Change:** Token address can be changed by owner, but ONLY when:
    - Contract is paused (safety requirement)
    - Contract token balance is zero (all lockups completed/revoked)
-   - This allows migrating to a new token while ensuring no active lockups exist
+   - All lockups are deleted (beneficiaries.length == 0)
+   - Must call `deleteLockup()` for each completed lockup before token change
+   - This ensures clean migration state with no active lockup data
 
 ## Documentation
 

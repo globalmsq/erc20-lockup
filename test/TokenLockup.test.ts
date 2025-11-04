@@ -366,6 +366,50 @@ describe('TokenLockup', function () {
         'NoTokensAvailable'
       );
     });
+
+    it('Should store vestedAtRevoke correctly', async function () {
+      // Advance to 50% vesting
+      await time.increase(CLIFF_DURATION + VESTING_DURATION / 2);
+
+      // Get vested amount before revoke
+      const vestedBefore = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vestedBefore).to.be.gt(0);
+      expect(vestedBefore).to.be.closeTo(TOTAL_AMOUNT / 2n, ethers.parseEther('100'));
+
+      // Revoke the lockup
+      await tokenLockup.revoke(beneficiary.address);
+
+      // Check lockup info - vestedAtRevoke should be stored
+      const lockup = await tokenLockup.lockups(beneficiary.address);
+      expect(lockup.revoked).to.be.true;
+      expect(lockup.vestedAtRevoke).to.be.closeTo(vestedBefore, ethers.parseEther('1')); // Allow small timing difference
+      expect(lockup.totalAmount).to.equal(TOTAL_AMOUNT); // Original totalAmount unchanged
+      expect(lockup.vestingDuration).to.equal(VESTING_DURATION); // Original vestingDuration unchanged
+
+      // Verify vested amount stays frozen at revoke point
+      await time.increase(VESTING_DURATION); // Advance time further
+      const vestedAfter = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vestedAfter).to.be.closeTo(vestedBefore, ethers.parseEther('1')); // Should not increase after revoke
+      expect(vestedAfter).to.equal(lockup.vestedAtRevoke); // Matches stored value exactly
+    });
+
+    it('Should not allow vesting to increase after revoke', async function () {
+      // Advance to 30% vesting
+      await time.increase(CLIFF_DURATION + (VESTING_DURATION * 3) / 10);
+      const vestedAtRevoke = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vestedAtRevoke).to.be.closeTo((TOTAL_AMOUNT * 3n) / 10n, ethers.parseEther('100'));
+
+      // Revoke
+      await tokenLockup.revoke(beneficiary.address);
+
+      // Advance to would-be 100% vesting
+      await time.increase(VESTING_DURATION);
+
+      // Vested amount should still be 30%, not 100%
+      const vestedAfter = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vestedAfter).to.be.closeTo(vestedAtRevoke, ethers.parseEther('1'));
+      expect(vestedAfter).to.be.lt(TOTAL_AMOUNT); // Less than total amount
+    });
   });
 
   describe('View Functions', function () {
@@ -683,6 +727,82 @@ describe('TokenLockup', function () {
       // Verify new tokens transferred to contract
       const contractBalance = await newToken.balanceOf(await tokenLockup.getAddress());
       expect(contractBalance).to.equal(TOTAL_AMOUNT);
+    });
+
+    it('Should revert when active lockups exist even with zero balance', async function () {
+      // Create a lockup
+      await token.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
+      await tokenLockup.createLockup(beneficiary.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+
+      // Complete vesting and release all tokens (contract balance becomes 0)
+      await time.increase(VESTING_DURATION);
+      await tokenLockup.connect(beneficiary).release();
+
+      // Verify balance is 0
+      const balance = await token.balanceOf(await tokenLockup.getAddress());
+      expect(balance).to.equal(0);
+
+      // Try to change token - should fail because lockup data still exists
+      await tokenLockup.pause();
+      await expect(
+        tokenLockup.changeToken(await newToken.getAddress())
+      ).to.be.revertedWithCustomError(tokenLockup, 'ActiveLockupsExist');
+    });
+
+    it('Should succeed after all lockups are deleted', async function () {
+      // Create a lockup
+      await token.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT);
+      await tokenLockup.createLockup(beneficiary.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+
+      // Complete vesting and release
+      await time.increase(VESTING_DURATION);
+      await tokenLockup.connect(beneficiary).release();
+
+      // Delete the completed lockup
+      await tokenLockup.deleteLockup(beneficiary.address);
+
+      // Now changeToken should succeed
+      await tokenLockup.pause();
+      await tokenLockup.changeToken(await newToken.getAddress());
+
+      // Verify token changed
+      expect(await tokenLockup.token()).to.equal(await newToken.getAddress());
+    });
+
+    it('Should revert with multiple lockups even if all released', async function () {
+      // Create two lockups
+      await token.approve(await tokenLockup.getAddress(), TOTAL_AMOUNT * 2n);
+      await tokenLockup.createLockup(beneficiary.address, TOTAL_AMOUNT, 0, VESTING_DURATION, false);
+      await tokenLockup.createLockup(
+        otherAccount.address,
+        TOTAL_AMOUNT,
+        0,
+        VESTING_DURATION,
+        false
+      );
+
+      // Complete vesting and release all
+      await time.increase(VESTING_DURATION);
+      await tokenLockup.connect(beneficiary).release();
+      await tokenLockup.connect(otherAccount).release();
+
+      // Contract balance is 0 but lockup data exists
+      const balance = await token.balanceOf(await tokenLockup.getAddress());
+      expect(balance).to.equal(0);
+
+      // Should fail - active lockups exist
+      await tokenLockup.pause();
+      await expect(
+        tokenLockup.changeToken(await newToken.getAddress())
+      ).to.be.revertedWithCustomError(tokenLockup, 'ActiveLockupsExist');
+
+      // Delete both lockups
+      await tokenLockup.deleteLockup(beneficiary.address);
+      await tokenLockup.deleteLockup(otherAccount.address);
+
+      // Now should succeed
+      await tokenLockup.changeToken(await newToken.getAddress());
+      expect(await tokenLockup.token()).to.equal(await newToken.getAddress());
     });
   });
 });

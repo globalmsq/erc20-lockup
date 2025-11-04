@@ -42,7 +42,7 @@ sut-lockup-contract/
 │       └── run-integration-tests.sh # Runs test suite inside container
 │
 ├── test/                  # Test suite
-│   ├── TokenLockup.test.ts # Unit tests (50 tests)
+│   ├── TokenLockup.test.ts # Unit tests (55 tests)
 │   ├── TokenValidation.test.ts # Token validation tests (10 tests)
 │   └── integration/       # Integration tests (60 tests)
 │       ├── 01-FullLifecycle.test.ts
@@ -407,10 +407,15 @@ Main contract implementing token lockup functionality:
 
 ### Security Features
 
-- **ReentrancyGuard**: Protects against reentrancy attacks
-- **SafeERC20**: Safe token transfers
+- **ReentrancyGuard**: Protects against reentrancy attacks on all token transfer functions
+- **SafeERC20**: Safe token transfers with proper error handling
 - **Ownable**: Access control for administrative functions
 - **Custom Errors**: Gas-efficient error handling
+- **Constructor Token Validation**: Prevents deployment with invalid or wrong-network token addresses
+- **Explicit Revocation State**: Stores vested amount at revocation time for transparency
+- **Active Lockup Prevention**: Prevents token changes when active lockup data exists
+
+For detailed security improvements, see [CLAUDE.md](CLAUDE.md#security-enhancements-latest)
 
 ## Docker Integration Testing
 

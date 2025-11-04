@@ -23,6 +23,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         uint256 vestingDuration;
         bool revocable;
         bool revoked;
+        uint256 vestedAtRevoke; // Amount vested at revocation time (0 if not revoked)
     }
 
     IERC20 public token;
@@ -62,6 +63,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     error InsufficientBalance();
     error TokensStillLocked();
     error MaxLockupsReached();
+    error ActiveLockupsExist();
 
     /**
      * @notice Constructor
@@ -117,7 +119,8 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
             cliffDuration: cliffDuration,
             vestingDuration: vestingDuration,
             revocable: revocable,
-            revoked: false
+            revoked: false,
+            vestedAtRevoke: 0
         });
 
         // Add to beneficiaries array
@@ -152,8 +155,9 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice Revoke a lockup and return unvested tokens to owner
      * @param beneficiary Address of the beneficiary whose lockup to revoke
-     * @dev Freezes vesting at current amount. Beneficiary can still claim vested tokens.
-     *      Sets vestingDuration to 0 as additional safety measure.
+     * @dev Freezes vesting at current amount by explicitly storing vestedAtRevoke.
+     *      Beneficiary can still claim vested tokens up to the revoked amount.
+     *      Original totalAmount and vestingDuration remain unchanged for transparency.
      * @custom:security Only revocable lockups can be revoked. Cannot be revoked twice.
      *      Protected by ReentrancyGuard for defense-in-depth.
      */
@@ -167,10 +171,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         uint256 refund = lockup.totalAmount - vested;
 
         lockup.revoked = true;
-        // Freeze vesting at current amount by updating totalAmount
-        lockup.totalAmount = vested;
-        // Additional safety: make vesting calculation impossible
-        lockup.vestingDuration = 0;
+        lockup.vestedAtRevoke = vested; // Explicitly store vested amount at revocation
 
         if (refund > 0) {
             token.safeTransfer(owner(), refund);
@@ -218,6 +219,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      * @dev Uses linear vesting formula: (totalAmount × timeFromStart) / vestingDuration
      *      Note: Integer division may cause minor rounding down during vesting period.
      *      This is compensated by releasing all remaining tokens at the end.
+     *      For revoked lockups, returns the explicitly stored vestedAtRevoke amount.
      */
     function _vestedAmount(address beneficiary) private view returns (uint256) {
         LockupInfo memory lockup = lockups[beneficiary];
@@ -226,9 +228,9 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
             return 0;
         }
 
-        // If revoked, totalAmount is frozen at revocation time - just return it
+        // If revoked, return the explicitly stored vested amount at revocation time
         if (lockup.revoked) {
-            return lockup.totalAmount;
+            return lockup.vestedAtRevoke;
         }
 
         if (block.timestamp < lockup.startTime + lockup.cliffDuration) {
@@ -266,7 +268,8 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      * @dev Only owner can change token address
      *      Contract must be paused for safety
      *      Contract must have zero token balance (all lockups completed)
-     * @custom:security Requires paused state and zero balance verification
+     *      All lockups must be deleted (no active lockup data)
+     * @custom:security Requires paused state, zero balance, and no active lockups
      */
     function changeToken(address newToken) external onlyOwner whenPaused {
         if (newToken == address(0)) revert InvalidTokenAddress();
@@ -274,6 +277,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         address oldToken = address(token);
         if (newToken == oldToken) revert SameTokenAddress();
         if (token.balanceOf(address(this)) != 0) revert TokensStillLocked();
+        if (beneficiaries.length > 0) revert ActiveLockupsExist();
 
         token = IERC20(newToken);
 
@@ -291,7 +295,10 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         if (lockup.totalAmount == 0) revert NoLockupFound();
 
         // Ensure lockup is fully completed (all tokens released)
-        if (lockup.releasedAmount != lockup.totalAmount) revert TokensStillLocked();
+        // For revoked lockups: check against vestedAtRevoke
+        // For non-revoked lockups: check against totalAmount
+        uint256 expectedAmount = lockup.revoked ? lockup.vestedAtRevoke : lockup.totalAmount;
+        if (lockup.releasedAmount != expectedAmount) revert TokensStillLocked();
 
         // Remove from beneficiaries array using swap and pop
         uint256 index = beneficiaryIndex[beneficiary] - 1; // Convert to 0-based

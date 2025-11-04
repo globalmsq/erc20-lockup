@@ -88,6 +88,9 @@ describe('Integration: Token Address Change', function () {
 
       console.log(`  ✅ Contract balance: ${ethers.formatEther(contractBalance)} tokens`);
 
+      // Delete completed lockup before token change
+      await tokenLockup.deleteLockup(beneficiary1.address);
+
       // Pause and change token
       await tokenLockup.pause();
       await tokenLockup.changeToken(await newToken.getAddress());
@@ -230,6 +233,10 @@ describe('Integration: Token Address Change', function () {
       const balance = await oldToken.balanceOf(await tokenLockup.getAddress());
       expect(balance).to.equal(0);
 
+      // Delete completed lockups before token change
+      await tokenLockup.deleteLockup(beneficiary1.address);
+      await tokenLockup.deleteLockup(beneficiary2.address);
+
       // Change token
       await tokenLockup.pause();
       await tokenLockup.changeToken(await newToken.getAddress());
@@ -286,6 +293,9 @@ describe('Integration: Token Address Change', function () {
       await time.increase(VESTING_DURATION);
       await tokenLockup.connect(beneficiary1).release();
 
+      // Delete completed lockup before second migration
+      await tokenLockup.deleteLockup(beneficiary1.address);
+
       // Second migration: new → third
       await tokenLockup.pause();
       await tokenLockup.changeToken(await thirdToken.getAddress());
@@ -338,6 +348,9 @@ describe('Integration: Token Address Change', function () {
       // Complete and release
       await time.increase(VESTING_DURATION);
       await tokenLockup.connect(beneficiary1).release();
+
+      // Delete completed lockup before token change
+      await tokenLockup.deleteLockup(beneficiary1.address);
 
       // Change token
       await tokenLockup.pause();

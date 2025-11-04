@@ -645,6 +645,19 @@ The contract owner has significant privileges that require careful handling:
    - Must call `deleteLockup()` for each completed lockup before token change
    - This ensures clean migration state with no active lockup data
 
+8. **Beneficiary Address Restrictions:** The following addresses CANNOT be used as beneficiaries to prevent fund loss and role conflicts:
+   - ❌ **address(0)** - Zero address (prevents accidental burns)
+   - ❌ **address(this)** - Contract address itself (prevents permanent fund lock)
+     - **Risk:** Contract cannot call `release()` on itself as msg.sender
+     - **Impact:** Tokens permanently locked with no recovery mechanism
+     - **Revocation:** Even `revoke()` cannot recover since beneficiary = contract
+   - ❌ **owner()** - Owner address (prevents role separation violations)
+     - **Risk:** Owner could create lockup for themselves and immediately revoke
+     - **Impact:** Violates trust model where owner = admin, beneficiary = recipient
+     - **Conflicts:** Owner has pause/unpause/changeToken privileges incompatible with beneficiary role
+
+   All three validations are enforced in `createLockup()` and revert with `InvalidBeneficiary()` error.
+
 ## Documentation
 
 - `docs/prd.md`: Product requirements and technical specifications

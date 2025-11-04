@@ -116,6 +116,8 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         bool revocable
     ) external onlyOwner whenNotPaused nonReentrant {
         if (beneficiary == address(0)) revert InvalidBeneficiary();
+        if (beneficiary == address(this)) revert InvalidBeneficiary();
+        if (beneficiary == owner()) revert InvalidBeneficiary();
         if (amount == 0) revert InvalidAmount();
         if (vestingDuration == 0) revert InvalidDuration();
         if (vestingDuration > MAX_VESTING_DURATION) revert InvalidDuration();

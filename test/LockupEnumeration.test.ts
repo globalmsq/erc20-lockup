@@ -216,7 +216,7 @@ describe('TokenLockup - Enumeration', function () {
     beforeEach(async function () {
       // Create 5 lockups
       const signers = await ethers.getSigners();
-      for (let i = 0; i < 5; i++) {
+      for (let i = 1; i <= 5; i++) {
         await tokenLockup.createLockup(
           signers[i].address,
           TOTAL_AMOUNT,
@@ -367,7 +367,7 @@ describe('TokenLockup - Enumeration', function () {
       const signers = await ethers.getSigners();
       const testLimit = 10;
 
-      for (let i = 0; i < testLimit; i++) {
+      for (let i = 1; i <= testLimit; i++) {
         await tokenLockup.createLockup(
           signers[i].address,
           TOTAL_AMOUNT,

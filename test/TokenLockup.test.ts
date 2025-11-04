@@ -113,6 +113,32 @@ describe('TokenLockup', function () {
       ).to.be.revertedWithCustomError(tokenLockup, 'InvalidBeneficiary');
     });
 
+    it('Should revert when beneficiary is contract address (self-lock prevention)', async function () {
+      const lockupAddress = await tokenLockup.getAddress();
+
+      await expect(
+        tokenLockup.createLockup(
+          lockupAddress,
+          TOTAL_AMOUNT,
+          CLIFF_DURATION,
+          VESTING_DURATION,
+          true
+        )
+      ).to.be.revertedWithCustomError(tokenLockup, 'InvalidBeneficiary');
+    });
+
+    it('Should revert when beneficiary is owner address', async function () {
+      await expect(
+        tokenLockup.createLockup(
+          owner.address,
+          TOTAL_AMOUNT,
+          CLIFF_DURATION,
+          VESTING_DURATION,
+          true
+        )
+      ).to.be.revertedWithCustomError(tokenLockup, 'InvalidBeneficiary');
+    });
+
     it('Should revert with zero amount', async function () {
       await expect(
         tokenLockup.createLockup(beneficiary.address, 0, CLIFF_DURATION, VESTING_DURATION, true)

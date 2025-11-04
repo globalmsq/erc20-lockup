@@ -349,13 +349,15 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         uint256 numerator = lockup.totalAmount * timeFromStart;
         uint256 vested = numerator / lockup.vestingDuration;
 
-        // Round up if remainder is >= half of divisor
+        // Round up if remainder is >= half of divisor, but never exceed totalAmount
         uint256 remainder = numerator % lockup.vestingDuration;
-        if (remainder * 2 >= lockup.vestingDuration) {
+        if (remainder * 2 >= lockup.vestingDuration && vested < lockup.totalAmount) {
             vested += 1;
         }
 
-        // Cap at totalAmount to prevent overflow
+        // Final defensive check to ensure vested never exceeds totalAmount
+        // Note: This should never trigger due to the early return guard at line 342
+        // and the condition in rounding above, but kept as defense-in-depth
         if (vested > lockup.totalAmount) {
             vested = lockup.totalAmount;
         }

@@ -381,10 +381,9 @@ describe('TokenLockup - Emergency Withdrawal', function () {
       await tokenLockup.revoke(beneficiary.address);
 
       // Cannot request unlock immediately (must wait 6 months after revocation)
-      await expect(tokenLockup.requestEmergencyUnlock(beneficiary.address)).to.be.revertedWithCustomError(
-        tokenLockup,
-        'EmergencyUnlockTooEarly'
-      );
+      await expect(
+        tokenLockup.requestEmergencyUnlock(beneficiary.address)
+      ).to.be.revertedWithCustomError(tokenLockup, 'EmergencyUnlockTooEarly');
 
       // After 6 months, can request unlock
       await time.increase(SIX_MONTHS);

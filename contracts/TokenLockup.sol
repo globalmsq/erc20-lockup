@@ -69,7 +69,10 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      * @notice Constructor
      * @param _token Address of the ERC20 token to be locked
      * @dev Validates that token address contains contract code and implements ERC20 interface
-     * @custom:security Prevents deployment with non-existent or invalid token addresses
+     * @custom:security Prevents deployment with non-existent or invalid token addresses.
+     *      Cannot detect ERC-777 compatibility layer on top of ERC-20.
+     *      Always verify token contract source code before deployment to ensure
+     *      it doesn't implement ERC-777 hooks (tokensReceived, tokensToSend).
      */
     constructor(address _token) Ownable(msg.sender) {
         if (_token == address(0)) revert InvalidTokenAddress();
@@ -81,9 +84,13 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         }
         if (size == 0) revert InvalidTokenAddress();
 
-        // Verify ERC20 interface compliance by calling totalSupply()
+        // Verify ERC20 interface compliance by calling totalSupply() and balanceOf()
         try IERC20(_token).totalSupply() returns (uint256) {
-            token = IERC20(_token);
+            try IERC20(_token).balanceOf(address(this)) returns (uint256) {
+                token = IERC20(_token);
+            } catch {
+                revert InvalidTokenAddress();
+            }
         } catch {
             revert InvalidTokenAddress();
         }
@@ -96,6 +103,10 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      * @param cliffDuration Duration of cliff period in seconds
      * @param vestingDuration Total vesting duration in seconds (including cliff)
      * @param revocable Whether the lockup can be revoked by owner
+     * @custom:security Protected by nonReentrant modifier for defense-in-depth against
+     *      ERC-777 reentrancy attacks via tokensReceived/tokensToSend hooks.
+     *      Primary protection comes from Checks-Effects-Interactions pattern.
+     *      Additional protection: nonReentrant adds ~2.4K gas but prevents theoretical attacks.
      */
     function createLockup(
         address beneficiary,
@@ -103,7 +114,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         uint256 cliffDuration,
         uint256 vestingDuration,
         bool revocable
-    ) external onlyOwner whenNotPaused {
+    ) external onlyOwner whenNotPaused nonReentrant {
         if (beneficiary == address(0)) revert InvalidBeneficiary();
         if (amount == 0) revert InvalidAmount();
         if (vestingDuration == 0) revert InvalidDuration();
@@ -196,6 +207,70 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      */
     function vestedAmount(address beneficiary) external view returns (uint256) {
         return _vestedAmount(beneficiary);
+    }
+
+    /**
+     * @notice Get vesting progress as percentage
+     * @param beneficiary Address to check
+     * @return Vesting progress (0-100)
+     * @dev Returns 100 for revoked or fully vested lockups
+     *      Returns 0 before cliff period or for non-existent lockups
+     */
+    function getVestingProgress(address beneficiary) external view returns (uint256) {
+        LockupInfo memory lockup = lockups[beneficiary];
+
+        // No lockup exists
+        if (lockup.totalAmount == 0) {
+            return 0;
+        }
+
+        // Revoked lockups are considered 100% complete (vesting is frozen/determined)
+        if (lockup.revoked) {
+            return 100;
+        }
+
+        // Before cliff period
+        if (block.timestamp < lockup.startTime + lockup.cliffDuration) {
+            return 0;
+        }
+
+        // After vesting completion
+        if (block.timestamp >= lockup.startTime + lockup.vestingDuration) {
+            return 100;
+        }
+
+        // During vesting period: calculate percentage
+        uint256 elapsed = block.timestamp - lockup.startTime;
+        return (elapsed * 100) / lockup.vestingDuration;
+    }
+
+    /**
+     * @notice Get remaining vesting time in seconds
+     * @param beneficiary Address to check
+     * @return Remaining time in seconds (0 if completed, revoked, or non-existent)
+     */
+    function getRemainingVestingTime(address beneficiary) external view returns (uint256) {
+        LockupInfo memory lockup = lockups[beneficiary];
+
+        // No lockup exists
+        if (lockup.totalAmount == 0) {
+            return 0;
+        }
+
+        // Revoked lockups have no remaining time (vesting is frozen)
+        if (lockup.revoked) {
+            return 0;
+        }
+
+        uint256 endTime = lockup.startTime + lockup.vestingDuration;
+
+        // Vesting already completed
+        if (block.timestamp >= endTime) {
+            return 0;
+        }
+
+        // Return remaining seconds
+        return endTime - block.timestamp;
     }
 
     /**

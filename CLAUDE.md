@@ -423,6 +423,142 @@ await newToken.approve(await tokenLockup.getAddress(), amount);
 await tokenLockup.createLockup(beneficiary, amount, cliff, vesting, revocable);
 ```
 
+### View Functions for UX
+
+Query lockup status and progress for frontend integrations:
+
+```typescript
+// Get vesting progress as percentage (0-100)
+const progress = await tokenLockup.getVestingProgress(beneficiary.address);
+console.log(`Vesting progress: ${progress}%`);
+
+// Get remaining vesting time in seconds
+const remaining = await tokenLockup.getRemainingVestingTime(beneficiary.address);
+const days = Math.floor(remaining / (24 * 60 * 60));
+console.log(`Remaining time: ${days} days`);
+
+// Get vested amount (tokens)
+const vested = await tokenLockup.vestedAmount(beneficiary.address);
+console.log(`Vested tokens: ${ethers.formatEther(vested)}`);
+
+// Get releasable amount (unclaimed vested tokens)
+const releasable = await tokenLockup.releasableAmount(beneficiary.address);
+console.log(`Claimable tokens: ${ethers.formatEther(releasable)}`);
+
+// Example: Display complete lockup status
+const lockup = await tokenLockup.lockups(beneficiary.address);
+const progress = await tokenLockup.getVestingProgress(beneficiary.address);
+const remaining = await tokenLockup.getRemainingVestingTime(beneficiary.address);
+
+console.log({
+  total: ethers.formatEther(lockup.totalAmount),
+  released: ethers.formatEther(lockup.releasedAmount),
+  progress: `${progress}%`,
+  remainingDays: Math.floor(remaining / (24 * 60 * 60)),
+  revoked: lockup.revoked,
+});
+```
+
+**Available View Functions:**
+
+- `vestedAmount(address)` - Returns total vested tokens
+- `releasableAmount(address)` - Returns claimable tokens (vested - released)
+- `getVestingProgress(address)` - Returns vesting progress as percentage (0-100)
+  - Returns 0 before cliff period
+  - Returns 100 for revoked or completed lockups
+- `getRemainingVestingTime(address)` - Returns remaining time in seconds
+  - Returns 0 for revoked or completed lockups
+- `lockups(address)` - Returns complete LockupInfo struct
+
+## Owner Privileges and Responsibilities
+
+**Critical Admin Functions (Owner-Only):**
+
+The contract owner has significant privileges that require careful handling:
+
+1. **createLockup()** - Create new token lockups
+   - **Privilege:** Owner controls which addresses receive lockups and their terms
+   - **Risk:** Centralized control over token distribution
+   - **Mitigation:** Use multi-sig wallet (e.g., Gnosis Safe) for production deployments
+   - **Gas Cost:** ~247K gas with nonReentrant protection
+
+2. **revoke()** - Cancel lockups and reclaim unvested tokens
+   - **Privilege:** Owner can revoke ANY revocable lockup at any time
+   - **Risk:** Beneficiaries lose unvested tokens if revoked
+   - **Mitigation:** Set `revocable=false` for immutable vesting schedules (investors, employees)
+   - **Use Cases:**
+     - `revocable=true`: Advisors, contractors, consultants (conditional grants)
+     - `revocable=false`: Core team, investors (guaranteed vesting)
+   - **Protection:** Beneficiaries can still claim all vested tokens up to revocation time
+
+3. **pause() / unpause()** - Halt all contract operations
+   - **Privilege:** Emergency stop affects ALL beneficiaries
+   - **Risk:** Blocks release(), createLockup(), and revoke() for everyone
+   - **Use Cases:**
+     - Security incidents or vulnerabilities discovered
+     - Token migration preparation
+     - Contract upgrade coordination
+   - **Protection:** Vesting continues during pause (time-based), only claims blocked
+
+4. **changeToken()** - Migrate to new token address
+   - **Privilege:** Changes the entire token being managed
+   - **Risk:** Major operational change affecting all future lockups
+   - **Requirements:**
+     - Contract must be paused (safety check)
+     - Token balance must be zero (all lockups settled)
+     - All lockups must be deleted (no active beneficiaries)
+   - **Use Case:** Migrating from old token to new token contract
+
+5. **deleteLockup()** - Remove completed lockup records
+   - **Privilege:** Cleanup function for completed vesting
+   - **Risk:** Affects address reusability for future lockups
+   - **Requirements:**
+     - All tokens must be released (releasedAmount == totalAmount or vestedAtRevoke)
+     - Lockup must be fully settled (no pending claims)
+   - **Use Case:** Free up beneficiary address for new lockup, reduce storage costs
+
+**Security Best Practices:**
+
+✅ **Production Recommendations:**
+
+- **Multi-Signature Wallet:** Use Gnosis Safe or similar for owner address
+  - Recommended: 3-of-5 or 4-of-7 configuration
+  - Prevents single point of failure
+  - Adds transparency and accountability
+
+- **Revocation Policy:** Document clearly before deployment
+  - Specify which lockup types are revocable
+  - Define conditions under which revocation may occur
+  - Communicate policy to all beneficiaries upfront
+
+- **Testing Protocol:**
+  - Test ALL admin functions on Amoy testnet first
+  - Verify multi-sig operations work correctly
+  - Practice emergency procedures (pause/unpause)
+  - Validate token change workflow with test tokens
+
+- **Operational Security:**
+  - Store private keys in hardware wallets (Ledger, Trezor)
+  - Use multi-sig for mainnet owner operations
+  - Implement time-locks for sensitive operations
+  - Monitor contract events for unauthorized access attempts
+
+**Trust Assumptions:**
+
+⚠️ **Beneficiaries Must Trust Owner For:**
+
+- Not revoking revocable lockups arbitrarily
+- Not pausing contract unnecessarily
+- Managing token migrations responsibly
+- Deleting lockups only after full release
+
+✅ **Trustless Guarantees:**
+
+- Vesting schedule is immutable once created
+- Non-revocable lockups cannot be cancelled
+- Mathematical vesting calculations (time-based)
+- Beneficiaries can always claim vested amounts (even after revocation)
+
 ## Important Constraints
 
 1. **Single Beneficiary per Deployment:** TokenLockup contract supports one beneficiary per deployment. For multiple beneficiaries, deploy multiple contracts.
@@ -454,9 +590,51 @@ await tokenLockup.createLockup(beneficiary, amount, cliff, vesting, revocable);
 4. **Immutable Schedule:** Once created, vesting schedule cannot be modified. Only option is revoke + delete + recreate.
 
 5. **Token Compatibility:** Only standard ERC20 tokens supported. Does NOT support:
-   - Rebasing tokens
-   - Fee-on-transfer tokens
-   - Deflationary tokens
+
+   **⚠️ CRITICAL SECURITY WARNING:**
+   - **ERC-777 tokens:** ❌ NOT supported due to reentrancy risk via `tokensReceived()` and `tokensToSend()` hooks
+     - While contract uses ReentrancyGuard and CEI pattern for defense-in-depth, ERC-777 hooks can still trigger during `safeTransferFrom()`
+     - Hook functions can call back into contract during token transfer
+     - **Risk:** Malicious hooks could manipulate state or drain funds
+     - **Mitigation:** Constructor validates ERC20 interface, but cannot detect ERC-777 compatibility layer
+
+   **Other Unsupported Token Types:**
+   - **Rebasing tokens:** Balance changes automatically (e.g., Ampleforth, stETH)
+   - **Fee-on-transfer tokens:** Deduct fees during transfers (actual received < specified amount)
+   - **Deflationary tokens:** Total supply decreases over time
+
+   **Pre-Deployment Verification Checklist:**
+
+   ✅ **Required Steps Before Production Deployment:**
+   1. **Verify Token Contract Code:**
+      - Check token contract source code on PolygonScan
+      - Look for ERC-777 interfaces: `tokensReceived`, `tokensToSend`, `ERC1820`
+      - Look for transfer hooks, callback functions, or delegate calls
+      - Verify it's a standard ERC-20 implementation
+
+   2. **Test with Small Amounts First:**
+      - Deploy to testnet (Amoy) with test tokens
+      - Create small test lockup (e.g., 1-10 tokens)
+      - Verify release mechanism works correctly
+      - Monitor for unexpected behavior
+
+   3. **Monitor Balance Changes:**
+      - After `createLockup()`, verify exact amount transferred: `token.balanceOf(contract)`
+      - Check no fees were deducted: `contractBalance == lockupAmount`
+      - After `release()`, verify beneficiary received exact vested amount
+      - Watch for any automatic balance changes over time
+
+   4. **Verify Token Type on PolygonScan:**
+      - **Mainnet SUT:** `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55`
+      - **Amoy SUT:** `0xE4C687167705Abf55d709395f92e254bdF5825a2`
+      - Check "Contract" tab → "Read Contract" → verify standard ERC-20 functions only
+      - Check "Contract" tab → "Code" → search for ERC-777 keywords
+
+   **Recovery from Incompatible Token:**
+   - ❌ No recovery mechanism if deployed with incompatible token
+   - ✅ Constructor validation prevents deployment with non-existent addresses
+   - ⚠️ Constructor cannot detect ERC-777 compatibility layer on top of ERC-20
+   - 🔄 Use `changeToken()` to migrate to compatible token after all lockups complete
 
 6. **No Partial Release in Current Version:** While PRD mentions partial release, current implementation does NOT include this feature. Only standard vesting + release.
 

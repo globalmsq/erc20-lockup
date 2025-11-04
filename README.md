@@ -7,6 +7,7 @@ Smart contract for managing SUT token lockup with vesting schedules on Polygon.
 - **Linear Vesting**: Tokens vest linearly over a specified duration
 - **Cliff Period**: Optional cliff period before vesting begins
 - **Revocable Lockups**: Owner can revoke lockups and reclaim unvested tokens
+- **UX View Functions**: Progress tracking and remaining time queries for frontend integrations
 - **Token Validation**: Constructor validates token exists and implements ERC20 standard
 - **Network Safety**: Prevents deployment with wrong network token addresses
 - **Gas Optimized**: Built with Solidity 0.8.24 and optimizations enabled
@@ -381,6 +382,36 @@ await lockupContract.revoke(beneficiaryAddress);
 2. **Vested but unreleased tokens** → Beneficiary can still claim
 3. **Already released tokens** → Irreversible (beneficiary keeps them)
 
+### Querying Lockup Status (View Functions)
+
+Check vesting progress and remaining time for frontend integrations:
+
+```typescript
+// Get vesting progress as percentage (0-100)
+const progress = await lockupContract.getVestingProgress(beneficiaryAddress);
+console.log(`Vesting progress: ${progress}%`);
+
+// Get remaining vesting time in seconds
+const remaining = await lockupContract.getRemainingVestingTime(beneficiaryAddress);
+const days = Math.floor(remaining / (24 * 60 * 60));
+console.log(`Remaining time: ${days} days`);
+
+// Get vested amount (tokens)
+const vested = await lockupContract.vestedAmount(beneficiaryAddress);
+console.log(`Vested: ${ethers.formatEther(vested)} tokens`);
+
+// Get releasable amount (claimable tokens)
+const releasable = await lockupContract.releasableAmount(beneficiaryAddress);
+console.log(`Claimable: ${ethers.formatEther(releasable)} tokens`);
+```
+
+**View Functions:**
+
+- `getVestingProgress(address)` - Returns 0-100 (0% before cliff, 100% after completion/revoke)
+- `getRemainingVestingTime(address)` - Returns seconds remaining (0 for completed/revoked)
+- `vestedAmount(address)` - Returns total vested tokens
+- `releasableAmount(address)` - Returns claimable tokens (vested - released)
+
 **Example scenario**:
 
 - Total lockup: 100 SUT
@@ -392,6 +423,138 @@ await lockupContract.revoke(beneficiaryAddress);
   - Beneficiary can still claim: 20.5 - 14.13 = **6.37 SUT** (vested but not released)
 
 > **⚠️ Warning**: Revoke is permanent and cannot be undone. Only works on lockups created with `revocable: true`.
+
+### Querying Multiple Lockups (Enumeration & Pagination)
+
+The contract provides enumeration functions to query all lockups without knowing beneficiary addresses in advance.
+
+#### When to Use Each Function
+
+**Use `getAllLockups()` when:**
+
+- Number of lockups < 20
+- Need complete list for local processing
+- One-time data export or backup
+- Gas cost not a concern (view functions are free for external calls)
+
+**Use `getLockupsPaginated()` when:**
+
+- Number of lockups > 20
+- Integrating with web/mobile frontend
+- Need to display lockups in pages/chunks
+- Want to minimize response size and processing time
+- Production integrations with potential for many lockups
+
+#### Pagination Examples
+
+**Basic pagination (10 lockups per page):**
+
+```typescript
+// Get total number of lockups
+const total = await lockupContract.getLockupCount();
+console.log(`Total lockups: ${total}`);
+
+// Get first 10 lockups (page 1)
+const page1 = await lockupContract.getLockupsPaginated(0, 10);
+console.log(`Page 1: ${page1.addresses.length} lockups`);
+
+// Get next 10 lockups (page 2)
+const page2 = await lockupContract.getLockupsPaginated(10, 10);
+console.log(`Page 2: ${page2.addresses.length} lockups`);
+
+// Get remaining lockups (page 3)
+const page3 = await lockupContract.getLockupsPaginated(20, total - 20);
+console.log(`Page 3: ${page3.addresses.length} lockups`);
+```
+
+**Complete pagination with UI integration:**
+
+```typescript
+const PAGE_SIZE = 10;
+const total = await lockupContract.getLockupCount();
+const totalPages = Math.ceil(total / PAGE_SIZE);
+
+// Fetch specific page (1-indexed for UI)
+async function fetchPage(pageNumber: number) {
+  const offset = (pageNumber - 1) * PAGE_SIZE;
+  const limit = Math.min(PAGE_SIZE, total - offset);
+
+  const result = await lockupContract.getLockupsPaginated(offset, limit);
+
+  return {
+    addresses: result.addresses,
+    lockups: result.lockupInfos,
+    page: pageNumber,
+    totalPages: totalPages,
+    hasNext: pageNumber < totalPages,
+    hasPrev: pageNumber > 1,
+  };
+}
+
+// Usage
+const page1Data = await fetchPage(1); // First page
+const page2Data = await fetchPage(2); // Second page
+```
+
+**Processing all lockups efficiently:**
+
+```typescript
+const PAGE_SIZE = 20;
+const total = await lockupContract.getLockupCount();
+let processed = 0;
+
+while (processed < total) {
+  const batch = await lockupContract.getLockupsPaginated(processed, PAGE_SIZE);
+
+  // Process this batch
+  for (let i = 0; i < batch.addresses.length; i++) {
+    const address = batch.addresses[i];
+    const lockup = batch.lockupInfos[i];
+
+    console.log(`Beneficiary: ${address}`);
+    console.log(`Total: ${ethers.formatEther(lockup.totalAmount)} SUT`);
+    console.log(`Released: ${ethers.formatEther(lockup.releasedAmount)} SUT`);
+    console.log(`Status: ${lockup.revoked ? 'Revoked' : 'Active'}`);
+    console.log('---');
+  }
+
+  processed += batch.addresses.length;
+}
+```
+
+#### Gas Costs Comparison
+
+**getAllLockups()** - Gas cost scales linearly with total number of lockups:
+
+- 10 lockups: ~50,000 gas
+- 50 lockups: ~250,000 gas
+- 100 lockups (maximum): ~500,000 gas
+
+**getLockupsPaginated()** - Fixed cost based on page size:
+
+- 10 lockups per page: ~50,000 gas (regardless of total lockups)
+- 20 lockups per page: ~100,000 gas
+- 50 lockups per page: ~250,000 gas
+
+**Recommendation**: Always use pagination for production frontends. Even with < 20 lockups, pagination provides better UX (faster initial load) and scales gracefully as lockups grow.
+
+#### Enumeration Functions
+
+```typescript
+// Get total number of lockups
+const count = await lockupContract.getLockupCount();
+
+// Get all beneficiary addresses only
+const addresses = await lockupContract.getAllBeneficiaries();
+
+// Get all lockups with details (not recommended for > 20 lockups)
+const [addresses, lockups] = await lockupContract.getAllLockups();
+
+// Get paginated lockups (recommended)
+const result = await lockupContract.getLockupsPaginated(offset, limit);
+```
+
+**Note**: View functions are free to call externally (no gas cost), but gas limits still apply. Polygon block gas limit is 30M gas, so `getAllLockups()` will work up to the 100 lockup maximum without hitting limits.
 
 ## Contract Architecture
 

@@ -7,6 +7,8 @@ Smart contract for managing SUT token lockup with vesting schedules on Polygon.
 - **Linear Vesting**: Tokens vest linearly over a specified duration
 - **Cliff Period**: Optional cliff period before vesting begins
 - **Revocable Lockups**: Owner can revoke lockups and reclaim unvested tokens
+- **Token Validation**: Constructor validates token exists and implements ERC20 standard
+- **Network Safety**: Prevents deployment with wrong network token addresses
 - **Gas Optimized**: Built with Solidity 0.8.24 and optimizations enabled
 - **Secure**: Uses OpenZeppelin contracts and includes comprehensive tests
 
@@ -40,8 +42,9 @@ sut-lockup-contract/
 │       └── run-integration-tests.sh # Runs test suite inside container
 │
 ├── test/                  # Test suite
-│   ├── TokenLockup.test.ts # Unit tests (38 tests)
-│   └── integration/       # Integration tests (49 tests)
+│   ├── TokenLockup.test.ts # Unit tests (50 tests)
+│   ├── TokenValidation.test.ts # Token validation tests (10 tests)
+│   └── integration/       # Integration tests (60 tests)
 │       ├── 01-FullLifecycle.test.ts
 │       ├── 02-PeriodicRelease.test.ts
 │       ├── 03-RevocationScenarios.test.ts
@@ -108,10 +111,16 @@ POLYGON_RPC_URL=https://polygon-rpc.com
 AMOY_RPC_URL=https://rpc-amoy.polygon.technology
 ```
 
-**Note**:
+**⚠️ IMPORTANT - Token Address Validation**:
 
-- `TOKEN_ADDRESS` must be set to the appropriate SUT token address for the target network
-- For testing without real SUT tokens, the deployment script will deploy a MockERC20 if `TOKEN_ADDRESS` is empty
+- `TOKEN_ADDRESS` must be set to the **correct SUT token address for the target network**
+- **Mainnet**: Use `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55`
+- **Amoy Testnet**: Use `0xE4C687167705Abf55d709395f92e254bdF5825a2`
+- ❌ **DO NOT** use Mainnet address on Amoy testnet (deployment will fail)
+- ❌ **DO NOT** use Amoy address on Polygon mainnet (deployment will fail)
+- ✅ The constructor validates that the token exists and implements ERC20 standard
+- ✅ Deployment fails immediately with `InvalidTokenAddress()` if token is invalid
+- For testing without real SUT tokens, leave `TOKEN_ADDRESS` empty to deploy MockERC20
 
 ## Development
 

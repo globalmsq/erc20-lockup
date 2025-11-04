@@ -56,6 +56,31 @@ TOKEN_ADDRESS=0xE4C687167705Abf55d709395f92e254bdF5825a2
 ETHERSCAN_API_KEY=your_etherscan_api_key  # 동일한 키 사용
 ```
 
+### 1.4 중요: 토큰 주소 검증
+
+**⚠️ 네트워크 불일치 방지:**
+
+TokenLockup 컨트랙트는 배포 시 토큰 주소를 자동으로 검증합니다:
+
+- ✅ **토큰 컨트랙트 존재 여부** 확인 (`extcodesize` 사용)
+- ✅ **ERC20 인터페이스 준수 여부** 확인 (`totalSupply()` 호출)
+- ❌ 잘못된 주소 사용 시 **즉시 배포 실패** (에러: `InvalidTokenAddress()`)
+
+**흔한 실수:**
+
+| 실수                                  | 결과         | 해결방법                       |
+| ------------------------------------- | ------------ | ------------------------------ |
+| Amoy 테스트넷에 메인넷 토큰 주소 사용 | 배포 실패 ❌ | `.env`에 Amoy 토큰 주소 설정   |
+| Polygon 메인넷에 Amoy 토큰 주소 사용  | 배포 실패 ❌ | `.env`에 메인넷 토큰 주소 설정 |
+| EOA 주소 (일반 지갑) 사용             | 배포 실패 ❌ | 실제 토큰 컨트랙트 주소 사용   |
+| 존재하지 않는 주소 사용               | 배포 실패 ❌ | 올바른 토큰 주소 확인          |
+
+**배포 전 체크리스트:**
+
+- [ ] `.env`의 `TOKEN_ADDRESS`가 올바른 네트워크용인지 확인
+- [ ] PolygonScan에서 토큰 주소가 실제 존재하는지 확인
+- [ ] 배포하려는 네트워크 (Mainnet/Amoy)와 토큰 주소가 일치하는지 확인
+
 ---
 
 ## Step 1: TokenLockup 컨트랙트 배포
@@ -267,19 +292,23 @@ LOCKUP_ADDRESS=0xABCD1234... npx hardhat run scripts/approve.ts --network amoy
 
 > **⚠️ 중요 제약사항:**
 >
-> 한 beneficiary 주소는 **평생 단 하나의 lockup만 생성 가능**합니다.
+> 한 beneficiary 주소는 **한 번에 하나의 활성 lockup만 가질 수 있습니다**.
 >
-> - Lockup 완료 또는 취소(revoke) 후에도 같은 주소로 재생성 **불가능**
-> - `lockups[beneficiary]` 매핑 엔트리가 영구적으로 유지됨 (`totalAmount != 0`)
-> - 추가 lockup이 필요한 경우:
->   - ✅ **다른 지갑 주소 사용** (권장)
+> - 동일 주소에 lockup이 이미 존재하면 새로 생성 **불가능** (`LockupAlreadyExists` 에러)
+> - **주소 재사용 방법:**
+>   - Lockup 완료 후 (모든 토큰 해제 완료) **`deleteLockup()`을 호출**하여 lockup 데이터 삭제
+>   - 삭제 후 동일 주소로 새 lockup 생성 가능
+>   - 삭제 조건: `releasedAmount == totalAmount` (모든 토큰이 해제됨)
+> - 추가 lockup이 필요한 경우 옵션:
+>   - ✅ **기존 lockup 완료 후 `deleteLockup()` 호출** → 같은 주소 재사용
+>   - ✅ **다른 지갑 주소 사용**
 >   - ✅ **새 TokenLockup 컨트랙트 배포**
-> - 이 설계는 감사 추적(audit trail) 보존과 상태 무결성을 위한 것입니다
 >
 > **예시:**
 >
-> - ❌ 잘못된 방법: beneficiary `0x1234...`에게 lockup 생성 → 완료 후 같은 주소로 다시 생성 시도 → `LockupAlreadyExists` 에러
-> - ✅ 올바른 방법: beneficiary `0x1234...`에게 첫 번째 lockup → 추가 lockup 필요 시 `0x5678...` (다른 주소) 사용
+> - ✅ 올바른 방법 1: beneficiary `0x1234...`에게 lockup 생성 → 완료 후 `deleteLockup(0x1234...)` → 같은 주소로 새 lockup 생성
+> - ✅ 올바른 방법 2: beneficiary `0x1234...`에게 첫 번째 lockup → 추가 lockup 필요 시 `0x5678...` (다른 주소) 사용
+> - ❌ 잘못된 방법: beneficiary `0x1234...`에게 lockup 생성 → 삭제 없이 같은 주소로 다시 생성 시도 → `LockupAlreadyExists` 에러
 
 ### 3.1 Hardhat Console 사용
 
@@ -575,17 +604,39 @@ if (now < cliffEnd) {
 
 **원인:** 해당 수혜자에 대한 락업이 이미 존재
 
-**중요:** Lockup을 취소(revoke)하거나 완료한 후에도 같은 beneficiary 주소로는 **재생성이 불가능**합니다. `lockups` 매핑 엔트리가 영구적으로 유지되기 때문입니다.
-
 **해결 방법:**
 
-1. **다른 지갑 주소 사용 (권장)**
+1. **Lockup 완료 후 삭제하여 주소 재사용 (권장)**
+
+   ```javascript
+   // Step 1: 모든 토큰이 해제되었는지 확인
+   const lockupInfo = await tokenLockup.lockups(beneficiaryAddress);
+   console.log('Total:', ethers.formatEther(lockupInfo.totalAmount));
+   console.log('Released:', ethers.formatEther(lockupInfo.releasedAmount));
+
+   // Step 2: 모든 토큰 해제 완료 후 lockup 삭제
+   if (lockupInfo.releasedAmount === lockupInfo.totalAmount) {
+     await tokenLockup.deleteLockup(beneficiaryAddress);
+     console.log('✅ Lockup deleted, address can be reused');
+   }
+
+   // Step 3: 동일 주소로 새 lockup 생성 가능
+   await tokenLockup.createLockup(
+     beneficiaryAddress, // 이제 같은 주소 사용 가능
+     newAmount,
+     cliffDuration,
+     vestingDuration,
+     revocable
+   );
+   ```
+
+2. **다른 지갑 주소 사용**
 
    ```javascript
    // 새로운 beneficiary 주소 사용
    const newBeneficiaryAddress = '0x새주소...';
    await tokenLockup.createLockup(
-     newBeneficiaryAddress, // 다른 주소
+     newBeneficiaryAddress,
      amount,
      cliffDuration,
      vestingDuration,
@@ -593,7 +644,7 @@ if (now < cliffEnd) {
    );
    ```
 
-2. **새 TokenLockup 컨트랙트 배포**
+3. **새 TokenLockup 컨트랙트 배포**
    ```bash
    # 새 컨트랙트를 배포하여 같은 beneficiary 사용
    pnpm deploy:testnet  # 또는 deploy:mainnet
@@ -602,12 +653,15 @@ if (now < cliffEnd) {
 **❌ 작동하지 않는 방법:**
 
 ```javascript
-// ❌ 이 방법은 작동하지 않습니다!
-await tokenLockup.revoke(beneficiaryAddress);  // 취소해도
-await tokenLockup.createLockup(beneficiaryAddress, ...);  // 재생성 불가 - LockupAlreadyExists 에러
+// ❌ revoke만으로는 주소 재사용 불가!
+await tokenLockup.revoke(beneficiaryAddress);  // 취소만 해도
+await tokenLockup.createLockup(beneficiaryAddress, ...);  // 여전히 LockupAlreadyExists 에러
 
-// 이유: revoke 후에도 lockups[beneficiary].totalAmount는 0이 아니므로
-// createLockup의 검증 로직에서 에러 발생
+// ✅ 올바른 방법: revoke → release → deleteLockup
+await tokenLockup.revoke(beneficiaryAddress);  // 1. 취소
+await tokenLockup.connect(beneficiary).release();  // 2. 베스팅된 토큰 해제
+await tokenLockup.deleteLockup(beneficiaryAddress);  // 3. 삭제
+await tokenLockup.createLockup(beneficiaryAddress, ...);  // 4. 재생성 가능
 ```
 
 **확인 방법:**
@@ -616,7 +670,7 @@ await tokenLockup.createLockup(beneficiaryAddress, ...);  // 재생성 불가 - 
 // 특정 주소에 lockup이 존재하는지 확인
 const lockupInfo = await tokenLockup.lockups(beneficiaryAddress);
 console.log('Total Amount:', ethers.formatEther(lockupInfo.totalAmount));
-// 0이 아니면 이미 lockup이 존재함 (재생성 불가)
+// 0이면 lockup 없음 (생성 가능), 0이 아니면 이미 존재 (삭제 필요)
 ```
 
 ### 문제 4: 가스비 부족

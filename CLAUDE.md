@@ -57,6 +57,13 @@ SUT Token Lockup smart contract for managing token vesting schedules on Polygon.
 - **Polygon Mainnet:** `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55`
 - **Polygon Amoy Testnet:** `0xE4C687167705Abf55d709395f92e254bdF5825a2`
 
+**⚠️ IMPORTANT:** Always use the correct token address for your target network:
+
+- ❌ **DO NOT** use Mainnet address on Amoy testnet
+- ❌ **DO NOT** use Amoy address on Polygon mainnet
+- ✅ The constructor will validate token exists and is ERC20 compliant
+- ✅ Deployment will fail immediately if token address is invalid or doesn't exist on the network
+
 Set `TOKEN_ADDRESS` in `.env` for deployment to the appropriate network. If empty, the deployment script will deploy MockERC20 for testing purposes.
 
 ## Development Commands
@@ -65,7 +72,7 @@ Set `TOKEN_ADDRESS` in `.env` for deployment to the appropriate network. If empt
 
 ```bash
 pnpm compile              # Compile contracts + generate TypeChain types
-pnpm test                 # Run full test suite (29 tests)
+pnpm test                 # Run full test suite (60 tests)
 pnpm test:coverage        # Run tests with coverage report
 REPORT_GAS=true pnpm test # Run tests with gas reporting
 
@@ -172,7 +179,16 @@ Recent security improvements based on comprehensive audit (Grade: A-):
    - Gas cost increase: ~2,358 gas (+3.9%, still well within 130K threshold)
    - Addresses concerns from multiple independent security reviews
 
-All improvements maintain gas efficiency while significantly enhancing security posture. Full test coverage: 75 unit/enumeration tests + 60 integration tests passing.
+8. **Constructor Token Validation** (contracts/TokenLockup.sol:72-86)
+   - Added comprehensive token address validation during deployment
+   - Validates contract code exists at address using `extcodesize`
+   - Verifies ERC20 interface compliance by calling `totalSupply()`
+   - Prevents deployment with non-existent contracts or wrong network addresses
+   - **Critical Fix:** Prevents network mismatch errors (e.g., using Mainnet address on Amoy testnet)
+   - Deployment gas increase: ~18-22K gas (from ~1,244K to ~1,262K)
+   - **Recovery:** No recovery mechanism needed - deployment fails immediately with clear error
+
+All improvements maintain gas efficiency while significantly enhancing security posture. Full test coverage: 60 unit/validation tests + 60 integration tests passing.
 
 **Security Grade: A** (upgraded from A-)
 

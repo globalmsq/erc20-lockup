@@ -66,10 +66,25 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     /**
      * @notice Constructor
      * @param _token Address of the ERC20 token to be locked
+     * @dev Validates that token address contains contract code and implements ERC20 interface
+     * @custom:security Prevents deployment with non-existent or invalid token addresses
      */
     constructor(address _token) Ownable(msg.sender) {
         if (_token == address(0)) revert InvalidTokenAddress();
-        token = IERC20(_token);
+
+        // Verify contract code exists at the address
+        uint256 size;
+        assembly {
+            size := extcodesize(_token)
+        }
+        if (size == 0) revert InvalidTokenAddress();
+
+        // Verify ERC20 interface compliance by calling totalSupply()
+        try IERC20(_token).totalSupply() returns (uint256) {
+            token = IERC20(_token);
+        } catch {
+            revert InvalidTokenAddress();
+        }
     }
 
     /**

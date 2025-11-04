@@ -11,6 +11,7 @@
 ## Executive Summary
 
 This comprehensive security audit examined the TokenLockup contract with a specific focus on:
+
 1. **Token unlock failure scenarios** - preventing scenarios where tokens cannot be released to beneficiaries
 2. **Token theft risks** - preventing unauthorized access and exploitation
 
@@ -38,6 +39,7 @@ The contract demonstrates **excellent security practices** with comprehensive pr
 #### `_vestedAmount()` Function (Lines 326-366)
 
 **Formula Implementation:**
+
 ```solidity
 uint256 numerator = lockup.totalAmount * timeFromStart;
 uint256 vested = numerator / lockingDuration;
@@ -77,6 +79,7 @@ if (remainder * 2 >= vestingDuration && vested < lockup.totalAmount) {
 #### `_releasableAmount()` Function (Lines 307-317)
 
 **Critical Logic:**
+
 ```solidity
 // If fully vested and not revoked, release all remaining tokens (eliminates rounding errors)
 if (!lockup.revoked && block.timestamp >= lockup.startTime + lockup.vestingDuration) {
@@ -100,6 +103,7 @@ return vested - lockup.releasedAmount;
 ### Test Coverage
 
 The contract has comprehensive test coverage for vesting calculations:
+
 - ✅ Edge cases: 1 wei, very large amounts, very short/long durations
 - ✅ Rounding boundaries: 49.9%, 50.1%, exact divisions
 - ✅ Multiple releases: Cumulative rounding error verification
@@ -122,22 +126,22 @@ The contract has comprehensive test coverage for vesting calculations:
 
 ```solidity
 function release() external nonReentrant whenNotPaused {
-    LockupInfo storage lockup = lockups[msg.sender];
-    if (lockup.totalAmount == 0) revert NoLockupFound();
+  LockupInfo storage lockup = lockups[msg.sender];
+  if (lockup.totalAmount == 0) revert NoLockupFound();
 
-    // Cancel emergency unlock request if exists
-    if (emergencyUnlockTime[msg.sender] != 0) {
-        delete emergencyUnlockTime[msg.sender];
-        emit EmergencyUnlockCancelled(msg.sender);
-    }
+  // Cancel emergency unlock request if exists
+  if (emergencyUnlockTime[msg.sender] != 0) {
+    delete emergencyUnlockTime[msg.sender];
+    emit EmergencyUnlockCancelled(msg.sender);
+  }
 
-    uint256 releasable = _releasableAmount(msg.sender);
-    if (releasable == 0) revert NoTokensAvailable();
+  uint256 releasable = _releasableAmount(msg.sender);
+  if (releasable == 0) revert NoTokensAvailable();
 
-    lockup.releasedAmount += releasable;  // State update BEFORE transfer
-    token.safeTransfer(msg.sender, releasable);
+  lockup.releasedAmount += releasable; // State update BEFORE transfer
+  token.safeTransfer(msg.sender, releasable);
 
-    emit TokensReleased(msg.sender, releasable);
+  emit TokensReleased(msg.sender, releasable);
 }
 ```
 
@@ -204,6 +208,7 @@ function release() external nonReentrant whenNotPaused {
 #### `emergencyWithdraw()` Function (Lines 476-499)
 
 **Critical Logic:**
+
 ```solidity
 uint256 expectedAmount = lockup.revoked ? lockup.vestedAtRevoke : lockup.totalAmount;
 uint256 amount = expectedAmount - lockup.releasedAmount;
@@ -255,27 +260,27 @@ uint256 amount = expectedAmount - lockup.releasedAmount;
 
 ```solidity
 function revoke(address beneficiary) external onlyOwner whenNotPaused nonReentrant {
-    LockupInfo storage lockup = lockups[beneficiary];
-    if (lockup.totalAmount == 0) revert NoLockupFound();
-    if (lockup.revoked) revert AlreadyRevoked();
-    if (!lockup.revocable) revert NotRevocable();
+  LockupInfo storage lockup = lockups[beneficiary];
+  if (lockup.totalAmount == 0) revert NoLockupFound();
+  if (lockup.revoked) revert AlreadyRevoked();
+  if (!lockup.revocable) revert NotRevocable();
 
-    uint256 vested = _vestedAmount(beneficiary);
-    // Defensive check
-    if (vested > lockup.totalAmount) {
-        vested = lockup.totalAmount;
-    }
-    uint256 refund = lockup.totalAmount - vested;
+  uint256 vested = _vestedAmount(beneficiary);
+  // Defensive check
+  if (vested > lockup.totalAmount) {
+    vested = lockup.totalAmount;
+  }
+  uint256 refund = lockup.totalAmount - vested;
 
-    lockup.revoked = true;
-    lockup.vestedAtRevoke = vested;  // Explicitly store vested amount
-    lockup.revokedAt = block.timestamp;  // Store revocation timestamp
+  lockup.revoked = true;
+  lockup.vestedAtRevoke = vested; // Explicitly store vested amount
+  lockup.revokedAt = block.timestamp; // Store revocation timestamp
 
-    if (refund > 0) {
-        token.safeTransfer(owner(), refund);
-    }
+  if (refund > 0) {
+    token.safeTransfer(owner(), refund);
+  }
 
-    emit LockupRevoked(beneficiary, refund);
+  emit LockupRevoked(beneficiary, refund);
 }
 ```
 
@@ -360,6 +365,7 @@ mapping(address => uint256) private beneficiaryIndex; // 1-based index
 ### Potential Race Conditions
 
 **Analysis:**
+
 - `deleteLockup()` invalidates `beneficiaryIndex` FIRST (line 526)
 - Second concurrent call would fail immediately (index = 0)
 - No external calls between state updates
@@ -380,22 +386,23 @@ mapping(address => uint256) private beneficiaryIndex; // 1-based index
 
 #### Owner-Only Functions
 
-| Function | Modifier | Line | Status |
-|----------|----------|------|--------|
-| `createLockup()` | `onlyOwner` | 129 | ✅ |
-| `revoke()` | `onlyOwner` | 197 | ✅ |
-| `pause()` | `onlyOwner` | 373 | ✅ |
-| `unpause()` | `onlyOwner` | 381 | ✅ |
-| `changeToken()` | `onlyOwner` | 395 | ✅ |
-| `requestEmergencyUnlock()` | `onlyOwner` | 434 | ✅ |
-| `emergencyWithdraw()` | `onlyOwner` | 476 | ✅ |
-| `deleteLockup()` | `onlyOwner` | 507 | ✅ |
+| Function                   | Modifier    | Line | Status |
+| -------------------------- | ----------- | ---- | ------ |
+| `createLockup()`           | `onlyOwner` | 129  | ✅     |
+| `revoke()`                 | `onlyOwner` | 197  | ✅     |
+| `pause()`                  | `onlyOwner` | 373  | ✅     |
+| `unpause()`                | `onlyOwner` | 381  | ✅     |
+| `changeToken()`            | `onlyOwner` | 395  | ✅     |
+| `requestEmergencyUnlock()` | `onlyOwner` | 434  | ✅     |
+| `emergencyWithdraw()`      | `onlyOwner` | 476  | ✅     |
+| `deleteLockup()`           | `onlyOwner` | 507  | ✅     |
 
 **Verdict:** ✅ All owner functions properly protected
 
 #### Beneficiary Restrictions
 
 **In `createLockup()` (Lines 130-132):**
+
 ```solidity
 if (beneficiary == address(0)) revert InvalidBeneficiary();
 if (beneficiary == address(this)) revert InvalidBeneficiary();
@@ -421,18 +428,22 @@ if (beneficiary == owner()) revert InvalidBeneficiary();
 #### Pause Mechanism
 
 **Functions Protected by `whenNotPaused`:**
+
 - ✅ `createLockup()` (line 129)
 - ✅ `release()` (line 169)
 - ✅ `revoke()` (line 197)
 
 **Functions Protected by `whenPaused`:**
+
 - ✅ `changeToken()` (line 395)
 
 **Functions NOT Protected:**
+
 - ⚠️ `deleteLockup()` (line 507) - Can be called when paused
 - ⚠️ `requestEmergencyUnlock()` (line 434) - Can be called when paused
 
 **Analysis:**
+
 - `deleteLockup()` only deletes completed lockups (all tokens released)
 - Does not transfer tokens or modify critical state
 - May be intentional for cleanup during pause
@@ -457,26 +468,32 @@ if (beneficiary == owner()) revert InvalidBeneficiary();
 #### Transfer Points
 
 1. ✅ **`createLockup()` - Line 156**
+
    ```solidity
    token.safeTransferFrom(msg.sender, address(this), amount);
    ```
+
    - Uses `SafeERC20.safeTransferFrom()`
    - Handles non-standard ERC20 tokens
    - Reverts on failure
    - **Verdict:** ✅ SECURE
 
 2. ✅ **`release()` - Line 183**
+
    ```solidity
    token.safeTransfer(msg.sender, releasable);
    ```
+
    - Uses `SafeERC20.safeTransfer()`
    - State updated before transfer (CEI pattern)
    - **Verdict:** ✅ SECURE
 
 3. ✅ **`revoke()` - Line 215**
+
    ```solidity
    token.safeTransfer(owner(), refund);
    ```
+
    - Uses `SafeERC20.safeTransfer()`
    - State updated before transfer
    - **Verdict:** ✅ SECURE
@@ -485,6 +502,7 @@ if (beneficiary == owner()) revert InvalidBeneficiary();
    ```solidity
    token.safeTransfer(owner(), amount);
    ```
+
    - Uses `SafeERC20.safeTransfer()`
    - State updated before transfer
    - **Verdict:** ✅ SECURE
@@ -513,6 +531,7 @@ if (beneficiary == owner()) revert InvalidBeneficiary();
 **Status:** ⚠️ **NOT SUPPORTED** (documented limitation)
 
 **Analysis:**
+
 - Contract tracks `totalAmount` not actual balance
 - If token takes fees, `balanceOf(contract)` < `totalAmount`
 - Would cause accounting mismatch
@@ -554,6 +573,7 @@ if (beneficiary == owner()) revert InvalidBeneficiary();
 ### Test Coverage
 
 The contract has comprehensive tests for rounding:
+
 - ✅ Odd amounts: 1000 tokens + 3 wei
 - ✅ Short durations: 3 seconds vesting
 - ✅ Small amounts: 1 wei, 10 wei
@@ -603,25 +623,25 @@ The contract has comprehensive tests for rounding:
 
 ```solidity
 constructor(address _token) Ownable(msg.sender) {
-    if (_token == address(0)) revert InvalidTokenAddress();
+  if (_token == address(0)) revert InvalidTokenAddress();
 
-    // Verify contract code exists
-    uint256 size;
-    assembly {
-        size := extcodesize(_token)
-    }
-    if (size == 0) revert InvalidTokenAddress();
+  // Verify contract code exists
+  uint256 size;
+  assembly {
+    size := extcodesize(_token)
+  }
+  if (size == 0) revert InvalidTokenAddress();
 
-    // Verify ERC20 interface
-    try IERC20(_token).totalSupply() returns (uint256) {
-        try IERC20(_token).balanceOf(address(this)) returns (uint256) {
-            token = IERC20(_token);
-        } catch {
-            revert InvalidTokenAddress();
-        }
+  // Verify ERC20 interface
+  try IERC20(_token).totalSupply() returns (uint256) {
+    try IERC20(_token).balanceOf(address(this)) returns (uint256) {
+      token = IERC20(_token);
     } catch {
-        revert InvalidTokenAddress();
+      revert InvalidTokenAddress();
     }
+  } catch {
+    revert InvalidTokenAddress();
+  }
 }
 ```
 
@@ -704,6 +724,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 **Scenario:** Emergency unlock requested, beneficiary tries to release
 **Expected:** Beneficiary should always be able to release vested tokens
 **Result:** ✅ **SECURE**
+
 - `release()` automatically cancels emergency unlock (lines 174-177)
 - Beneficiary can release tokens at any time
 - Emergency unlock cannot prevent beneficiary from claiming
@@ -713,6 +734,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 **Scenario:** Owner requests emergency unlock, beneficiary doesn't claim
 **Expected:** Owner can only withdraw after 6 months + 30 days, and only unclaimed tokens
 **Result:** ✅ **SECURE**
+
 - 6-month waiting period enforced (lines 448-452, 458-460)
 - 30-day grace period enforced (line 464)
 - Beneficiary can cancel by calling `release()` at any time
@@ -723,6 +745,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 **Scenario:** Lockup with amount that doesn't divide evenly
 **Expected:** All tokens should be releasable at vesting end
 **Result:** ✅ **SECURE**
+
 - `_releasableAmount()` returns `totalAmount - releasedAmount` at vesting end (line 313)
 - All remaining tokens released, eliminating rounding dust
 - Comprehensive tests verify this behavior
@@ -732,6 +755,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 **Scenario:** Revoke during vesting, beneficiary tries to claim
 **Expected:** Beneficiary should claim up to `vestedAtRevoke`
 **Result:** ✅ **SECURE**
+
 - `_vestedAmount()` returns `vestedAtRevoke` for revoked lockups (line 335)
 - Beneficiary can claim vested tokens after revocation
 - Test coverage confirms this behavior
@@ -741,6 +765,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 **Scenario:** Delete lockup while tokens still locked
 **Expected:** `deleteLockup()` should revert if tokens not fully released
 **Result:** ✅ **SECURE**
+
 - `deleteLockup()` checks `releasedAmount == expectedAmount` (line 515)
 - For revoked: checks against `vestedAtRevoke`
 - For non-revoked: checks against `totalAmount`
@@ -751,6 +776,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 **Scenario:** Very large amounts or very long durations
 **Expected:** Solidity 0.8.24 should revert on overflow
 **Result:** ✅ **SECURE**
+
 - Solidity 0.8.24 has built-in overflow protection
 - Will revert safely if `totalAmount * timeFromStart` overflows
 - Prevents incorrect calculations
@@ -760,6 +786,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 **Scenario:** Malicious ERC777 token with hooks
 **Expected:** `nonReentrant` modifier should prevent reentrancy
 **Result:** ✅ **SECURE**
+
 - All transfer functions have `nonReentrant` modifier
 - CEI pattern ensures state updated before transfers
 - Multiple layers of protection
@@ -769,6 +796,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 **Scenario:** Fee-on-transfer token or rebasing token
 **Expected:** Should revert or handle gracefully
 **Result:** ✅ **ACCEPTABLE**
+
 - Contract tracks `totalAmount` not actual balance
 - Fee-on-transfer tokens not supported (documented)
 - SafeERC20 will revert if transfer fails
@@ -781,6 +809,7 @@ function getLockupsPaginated(uint256 offset, uint256 limit) external view return
 ### Critical Issues: **0**
 
 No critical vulnerabilities found that could:
+
 - Prevent tokens from being released
 - Allow unauthorized token theft
 - Cause permanent token lockup
@@ -851,6 +880,7 @@ No medium-severity vulnerabilities found.
 ### Priority 3 (Testing - Already Comprehensive)
 
 The contract already has excellent test coverage. Consider:
+
 1. Fuzzing tests for edge cases (optional enhancement)
 2. Formal verification for critical calculations (optional enhancement)
 

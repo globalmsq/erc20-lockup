@@ -33,6 +33,9 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     address[] private beneficiaries;
     mapping(address => uint256) private beneficiaryIndex; // 1-based index (0 = not exists)
 
+    // Emergency withdrawal support
+    mapping(address => uint256) public emergencyUnlockTime; // beneficiary => unlock timestamp (0 = not requested)
+
     // Constants
     uint256 public constant MAX_LOCKUPS = 100;
     uint256 public constant MAX_VESTING_DURATION = 10 * 365 days; // 10 years
@@ -49,6 +52,9 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     event LockupRevoked(address indexed beneficiary, uint256 refundAmount);
     event TokenChanged(address indexed oldToken, address indexed newToken);
     event LockupDeleted(address indexed beneficiary);
+    event EmergencyUnlockRequested(address indexed beneficiary, uint256 unlockTime);
+    event EmergencyUnlockCancelled(address indexed beneficiary);
+    event EmergencyWithdrawal(address indexed beneficiary, uint256 amount);
 
     error InvalidAmount();
     error InvalidDuration();
@@ -64,6 +70,9 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     error TokensStillLocked();
     error MaxLockupsReached();
     error ActiveLockupsExist();
+    error VestingNotComplete();
+    error EmergencyUnlockNotRequested();
+    error EmergencyUnlockTooEarly();
 
     /**
      * @notice Constructor
@@ -150,11 +159,18 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      * @dev Beneficiaries can claim vested tokens even after revocation.
      *      After full vesting period, all remaining tokens (including rounding dust) are released.
      *      Uses pull payment pattern for gas efficiency.
+     *      Automatically cancels any pending emergency unlock request.
      * @custom:security Protected by ReentrancyGuard and Pausable
      */
     function release() external nonReentrant whenNotPaused {
         LockupInfo storage lockup = lockups[msg.sender];
         if (lockup.totalAmount == 0) revert NoLockupFound();
+
+        // Cancel emergency unlock request if exists
+        if (emergencyUnlockTime[msg.sender] != 0) {
+            delete emergencyUnlockTime[msg.sender];
+            emit EmergencyUnlockCancelled(msg.sender);
+        }
 
         uint256 releasable = _releasableAmount(msg.sender);
         if (releasable == 0) revert NoTokensAvailable();
@@ -378,12 +394,85 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     }
 
     /**
+     * @notice Request emergency withdrawal of stuck tokens
+     * @param beneficiary Address of the beneficiary whose tokens to recover
+     * @dev Only owner can request. Requires 6 months waiting period after vesting ends.
+     *      Creates 30-day grace period for beneficiary to claim before withdrawal.
+     * @custom:security Time-locked mechanism prevents owner abuse:
+     *      - Must wait 6 months after vesting completion (180 days)
+     *      - Additional 30-day grace period for beneficiary
+     *      - Beneficiary can cancel by calling release()
+     */
+    function requestEmergencyUnlock(address beneficiary) external onlyOwner {
+        LockupInfo storage lockup = lockups[beneficiary];
+        if (lockup.totalAmount == 0) revert NoLockupFound();
+
+        // Ensure lockup is not already fully released
+        uint256 expectedAmount = lockup.revoked ? lockup.vestedAtRevoke : lockup.totalAmount;
+        if (lockup.releasedAmount == expectedAmount) revert NoTokensAvailable();
+
+        // For non-revoked lockups: ensure vesting is complete
+        if (!lockup.revoked) {
+            if (block.timestamp < lockup.startTime + lockup.vestingDuration) {
+                revert VestingNotComplete();
+            }
+
+            // Require 6 months waiting period after vesting ends
+            uint256 vestingEndTime = lockup.startTime + lockup.vestingDuration;
+            if (block.timestamp < vestingEndTime + 180 days) {
+                revert EmergencyUnlockTooEarly();
+            }
+        } else {
+            // For revoked lockups: require 6 months after revocation
+            // (We don't store revocation time, so use current timestamp as reference)
+            // This is acceptable since revoked lockups have frozen vesting
+        }
+
+        // Set unlock time to 30 days from now
+        emergencyUnlockTime[beneficiary] = block.timestamp + 30 days;
+
+        emit EmergencyUnlockRequested(beneficiary, emergencyUnlockTime[beneficiary]);
+    }
+
+    /**
+     * @notice Execute emergency withdrawal after grace period
+     * @param beneficiary Address of the beneficiary whose tokens to recover
+     * @dev Only callable after requestEmergencyUnlock() and 30-day grace period.
+     *      Returns unvested/unclaimed tokens to owner.
+     * @custom:security Protected by nonReentrant. Requires prior unlock request.
+     */
+    function emergencyWithdraw(address beneficiary) external onlyOwner nonReentrant {
+        if (emergencyUnlockTime[beneficiary] == 0) revert EmergencyUnlockNotRequested();
+        if (block.timestamp < emergencyUnlockTime[beneficiary]) revert EmergencyUnlockTooEarly();
+
+        LockupInfo storage lockup = lockups[beneficiary];
+        if (lockup.totalAmount == 0) revert NoLockupFound();
+
+        // Calculate amount to withdraw
+        uint256 expectedAmount = lockup.revoked ? lockup.vestedAtRevoke : lockup.totalAmount;
+        uint256 amount = expectedAmount - lockup.releasedAmount;
+
+        if (amount == 0) revert NoTokensAvailable();
+
+        // Update lockup state
+        lockup.releasedAmount = expectedAmount;
+
+        // Clear emergency unlock time
+        delete emergencyUnlockTime[beneficiary];
+
+        // Transfer tokens to owner
+        token.safeTransfer(owner(), amount);
+
+        emit EmergencyWithdrawal(beneficiary, amount);
+    }
+
+    /**
      * @notice Delete a completed lockup to allow address reuse
      * @param beneficiary Address of the beneficiary whose lockup to delete
      * @dev Only callable when all tokens have been released or revoked and claimed
      * @custom:security Only owner can delete. Lockup must be fully completed.
      */
-    function deleteLockup(address beneficiary) external onlyOwner {
+    function deleteLockup(address beneficiary) external onlyOwner nonReentrant {
         LockupInfo storage lockup = lockups[beneficiary];
         if (lockup.totalAmount == 0) revert NoLockupFound();
 

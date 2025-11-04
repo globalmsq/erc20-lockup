@@ -28,7 +28,7 @@ SUT 토큰에 대한 Lockup(잠금) 메커니즘을 구현하여, 설정된 기�
 - **투명성**: 모든 거래 온체인 기록 및 이벤트 로깅
 - **신뢰성**: 예측 가능한 선형 베스팅 스케줄
 - **유연성**: Revocable Lockup, Partial Release 지원
-- **효율성**: 가스비 최적화 및 Proxy Pattern을 통한 업그레이드 가능
+- **효율성**: 가스비 최적화 및 토큰 주소 변경 지원
 
 ---
 
@@ -268,25 +268,6 @@ uint256 elapsedMonths = (block.timestamp - startTime) / MONTH_DURATION;
 - 수혜자와 관리자 분리 (서로 다른 주소)
 - 역할별 권한 명확화
 
-#### Proxy Pattern (UUPS)
-
-```
-┌─────────────────┐     ┌──────────────────┐
-│   Proxy         │────▶│  Implementation  │
-│  (Storage)      │     │    (Logic)       │
-└─────────────────┘     └──────────────────┘
-        ▲
-        │
-    User Call
-```
-
-**선택 이유:**
-
-- 가스 효율성 (EIP-1822)
-- 로직 업그레이드 가능
-- Storage collision 방지
-- 관리자만 업그레이드 가능
-
 ### 4.4 핵심 함수
 
 #### Lockup 관리
@@ -514,7 +495,6 @@ solidity: {
 - [OpenZeppelin Contracts](https://docs.openzeppelin.com/)
 - [Polygon Documentation](https://docs.polygon.technology/)
 - [EIP-20: Token Standard](https://eips.ethereum.org/EIPS/eip-20)
-- [EIP-1822: UUPS Proxy](https://eips.ethereum.org/EIPS/eip-1822)
 - [Ethereum Smart Contract Best Practices](https://consensys.github.io/smart-contract-best-practices/)
 
 ### C. 보안 체크리스트

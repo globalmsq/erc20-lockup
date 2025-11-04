@@ -350,6 +350,7 @@ mapping(address => uint256) private beneficiaryIndex; // 1-based
    - ✅ Synchronization is consistent
 
 2. **`deleteLockup()` (Lines 370-399):**
+
    ```solidity
    // Swap and pop pattern
    uint256 index = beneficiaryIndex[beneficiary] - 1;

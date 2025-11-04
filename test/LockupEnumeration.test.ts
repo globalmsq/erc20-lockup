@@ -353,6 +353,27 @@ describe('TokenLockup - Enumeration', function () {
       expect(lockup.releasedAmount).to.equal(0);
       expect(lockup.revocable).to.equal(false);
     });
+
+    it('Should prevent double deletion (race condition protection)', async function () {
+      // Complete lockup
+      await time.increase(VESTING_DURATION + 1);
+      await tokenLockup.connect(beneficiary1).release();
+
+      // First deletion succeeds
+      await tokenLockup.deleteLockup(beneficiary1.address);
+
+      // Second deletion on same address should fail immediately
+      // Thanks to atomicity: beneficiaryIndex is deleted first, so index lookup returns 0
+      await expect(tokenLockup.deleteLockup(beneficiary1.address)).to.be.revertedWithCustomError(
+        tokenLockup,
+        'NoLockupFound'
+      );
+
+      // Verify lockup is indeed deleted
+      const lockup = await tokenLockup.lockups(beneficiary1.address);
+      expect(lockup.totalAmount).to.equal(0);
+      expect(await tokenLockup.getLockupCount()).to.equal(0);
+    });
   });
 
   describe('MAX_LOCKUPS limit', function () {

@@ -319,7 +319,23 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         }
 
         uint256 timeFromStart = block.timestamp - lockup.startTime;
-        return (lockup.totalAmount * timeFromStart) / lockup.vestingDuration;
+
+        // Calculate vested amount with rounding to minimize cumulative loss
+        uint256 numerator = lockup.totalAmount * timeFromStart;
+        uint256 vested = numerator / lockup.vestingDuration;
+
+        // Round up if remainder is >= half of divisor
+        uint256 remainder = numerator % lockup.vestingDuration;
+        if (remainder * 2 >= lockup.vestingDuration) {
+            vested += 1;
+        }
+
+        // Cap at totalAmount to prevent overflow
+        if (vested > lockup.totalAmount) {
+            vested = lockup.totalAmount;
+        }
+
+        return vested;
     }
 
     /**
@@ -385,6 +401,9 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         if (index > lastIndex) revert InvalidBeneficiary();
         if (beneficiaries[index] != beneficiary) revert InvalidBeneficiary();
 
+        // Atomicity: Invalidate index first to prevent race conditions
+        delete beneficiaryIndex[beneficiary];
+
         if (index != lastIndex) {
             address lastBeneficiary = beneficiaries[lastIndex];
             beneficiaries[index] = lastBeneficiary;
@@ -392,7 +411,6 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         }
 
         beneficiaries.pop();
-        delete beneficiaryIndex[beneficiary];
         delete lockups[beneficiary];
 
         emit LockupDeleted(beneficiary);

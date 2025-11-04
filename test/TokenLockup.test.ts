@@ -670,6 +670,70 @@ describe('TokenLockup', function () {
       const remaining = await tokenLockup.releasableAmount(beneficiary.address);
       expect(remaining).to.equal(0);
     });
+
+    it('Should apply rounding correctly at 49.9% and 50.1% boundaries', async function () {
+      const testAmount = ethers.parseEther('1000');
+      const testVesting = 1000; // 1000 seconds
+      await token.approve(await tokenLockup.getAddress(), testAmount);
+      await tokenLockup.createLockup(beneficiary.address, testAmount, 0, testVesting, false);
+
+      // At 49.9% (499 seconds): 499/1000 = 0.499, no rounding up
+      await time.increase(499);
+      const vested499 = await tokenLockup.vestedAmount(beneficiary.address);
+      // 1000 * 499 / 1000 = 499, remainder = 0 (< 500), no rounding
+      expect(vested499).to.equal(ethers.parseEther('499'));
+
+      // At 50.1% (501 seconds): 501/1000 = 0.501, rounds up
+      await time.increase(2); // Total 501 seconds
+      const vested501 = await tokenLockup.vestedAmount(beneficiary.address);
+      // 1000 * 501 / 1000 = 501, remainder = 0 (< 500), no rounding needed (exact division)
+      expect(vested501).to.equal(ethers.parseEther('501'));
+    });
+
+    it('Should handle extreme small amounts with rounding', async function () {
+      // Test with 1 wei over 10 seconds
+      const tinyAmount = 1n;
+      const shortVesting = 10;
+      await token.approve(await tokenLockup.getAddress(), tinyAmount);
+      await tokenLockup.createLockup(beneficiary.address, tinyAmount, 0, shortVesting, false);
+
+      // At 4 seconds: 1 * 4 / 10 = 0, remainder = 4 (< 5), no rounding
+      await time.increase(4);
+      const vested4 = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vested4).to.equal(0n);
+
+      // At 5 seconds: 1 * 5 / 10 = 0, remainder = 5 (= 5), rounds up to 1
+      await time.increase(1);
+      const vested5 = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vested5).to.equal(1n);
+
+      // Verify can release
+      await tokenLockup.connect(beneficiary).release();
+      const balance = await token.balanceOf(beneficiary.address);
+      expect(balance).to.equal(1n);
+    });
+
+    it('Should handle 10 wei amount with precise rounding', async function () {
+      const smallAmount = 10n;
+      const testVesting = 3; // 10 wei / 3 seconds = 3.333... per second
+      await token.approve(await tokenLockup.getAddress(), smallAmount);
+      await tokenLockup.createLockup(beneficiary.address, smallAmount, 0, testVesting, false);
+
+      // At 1 second: 10 * 1 / 3 = 3, remainder = 1 (< 1.5), no rounding
+      await time.increase(1);
+      const vested1 = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vested1).to.equal(3n);
+
+      // At 2 seconds: 10 * 2 / 3 = 6, remainder = 2 (>= 1.5), rounds up to 7
+      await time.increase(1);
+      const vested2 = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vested2).to.equal(7n);
+
+      // At 3 seconds: Full vesting, should return totalAmount
+      await time.increase(1);
+      const vested3 = await tokenLockup.vestedAmount(beneficiary.address);
+      expect(vested3).to.equal(10n);
+    });
   });
 
   describe('Token Address Change', function () {

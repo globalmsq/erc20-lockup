@@ -24,6 +24,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         bool revocable;
         bool revoked;
         uint256 vestedAtRevoke; // Amount vested at revocation time (0 if not revoked)
+        uint256 revokedAt; // Timestamp when revoked (0 if not revoked)
     }
 
     IERC20 public token;
@@ -39,6 +40,8 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
     // Constants
     uint256 public constant MAX_LOCKUPS = 100;
     uint256 public constant MAX_VESTING_DURATION = 10 * 365 days; // 10 years
+    uint256 public constant EMERGENCY_UNLOCK_WAITING_PERIOD = 180 days; // 6 months after vesting/revocation
+    uint256 public constant EMERGENCY_UNLOCK_GRACE_PERIOD = 30 days; // Grace period for beneficiary to claim
 
     event TokensLocked(
         address indexed beneficiary,
@@ -142,7 +145,8 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
             vestingDuration: vestingDuration,
             revocable: revocable,
             revoked: false,
-            vestedAtRevoke: 0
+            vestedAtRevoke: 0,
+            revokedAt: 0
         });
 
         // Add to beneficiaries array
@@ -192,15 +196,20 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      */
     function revoke(address beneficiary) external onlyOwner whenNotPaused nonReentrant {
         LockupInfo storage lockup = lockups[beneficiary];
-        if (lockup.startTime == 0) revert NoLockupFound();
+        if (lockup.totalAmount == 0) revert NoLockupFound();
         if (lockup.revoked) revert AlreadyRevoked();
         if (!lockup.revocable) revert NotRevocable();
 
         uint256 vested = _vestedAmount(beneficiary);
+        // Ensure vested doesn't exceed totalAmount (defensive check)
+        if (vested > lockup.totalAmount) {
+            vested = lockup.totalAmount;
+        }
         uint256 refund = lockup.totalAmount - vested;
 
         lockup.revoked = true;
         lockup.vestedAtRevoke = vested; // Explicitly store vested amount at revocation
+        lockup.revokedAt = block.timestamp; // Store revocation timestamp
 
         if (refund > 0) {
             token.safeTransfer(owner(), refund);
@@ -379,6 +388,7 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
      *      Contract must have zero token balance (all lockups completed)
      *      All lockups must be deleted (no active lockup data)
      * @custom:security Requires paused state, zero balance, and no active lockups
+     *      Validates newToken is a contract with ERC20 interface (same as constructor)
      */
     function changeToken(address newToken) external onlyOwner whenPaused {
         if (newToken == address(0)) revert InvalidTokenAddress();
@@ -388,7 +398,23 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
         if (token.balanceOf(address(this)) != 0) revert TokensStillLocked();
         if (beneficiaries.length > 0) revert ActiveLockupsExist();
 
-        token = IERC20(newToken);
+        // Validate newToken is a contract (not an EOA)
+        uint256 size;
+        assembly {
+            size := extcodesize(newToken)
+        }
+        if (size == 0) revert InvalidTokenAddress();
+
+        // Validate ERC20 interface compliance
+        try IERC20(newToken).totalSupply() returns (uint256) {
+            try IERC20(newToken).balanceOf(address(this)) returns (uint256) {
+                token = IERC20(newToken);
+            } catch {
+                revert InvalidTokenAddress();
+            }
+        } catch {
+            revert InvalidTokenAddress();
+        }
 
         emit TokenChanged(oldToken, newToken);
     }
@@ -419,17 +445,21 @@ contract TokenLockup is Ownable, ReentrancyGuard, Pausable {
 
             // Require 6 months waiting period after vesting ends
             uint256 vestingEndTime = lockup.startTime + lockup.vestingDuration;
-            if (block.timestamp < vestingEndTime + 180 days) {
+            if (block.timestamp < vestingEndTime + EMERGENCY_UNLOCK_WAITING_PERIOD) {
                 revert EmergencyUnlockTooEarly();
             }
         } else {
             // For revoked lockups: require 6 months after revocation
-            // (We don't store revocation time, so use current timestamp as reference)
-            // This is acceptable since revoked lockups have frozen vesting
+            if (lockup.revokedAt == 0) {
+                revert NoLockupFound(); // Should never happen, but defensive check
+            }
+            if (block.timestamp < lockup.revokedAt + EMERGENCY_UNLOCK_WAITING_PERIOD) {
+                revert EmergencyUnlockTooEarly();
+            }
         }
 
         // Set unlock time to 30 days from now
-        emergencyUnlockTime[beneficiary] = block.timestamp + 30 days;
+        emergencyUnlockTime[beneficiary] = block.timestamp + EMERGENCY_UNLOCK_GRACE_PERIOD;
 
         emit EmergencyUnlockRequested(beneficiary, emergencyUnlockTime[beneficiary]);
     }

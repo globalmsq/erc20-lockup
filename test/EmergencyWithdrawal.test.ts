@@ -112,7 +112,9 @@ describe('TokenLockup - Emergency Withdrawal', function () {
       const ownerBalanceAfter = await token.balanceOf(owner.address);
 
       expect(ownerBalanceAfter - ownerBalanceBefore).to.equal(TOTAL_AMOUNT);
-      console.log(`  ✅ Emergency withdrawal completed: ${ethers.formatEther(TOTAL_AMOUNT)} tokens`);
+      console.log(
+        `  ✅ Emergency withdrawal completed: ${ethers.formatEther(TOTAL_AMOUNT)} tokens`
+      );
     });
   });
 
@@ -268,8 +270,12 @@ describe('TokenLockup - Emergency Withdrawal', function () {
       const tx = await tokenLockup.connect(beneficiary).release();
 
       // Both events should be emitted
-      await expect(tx).to.emit(tokenLockup, 'TokensReleased').withArgs(beneficiary.address, TOTAL_AMOUNT);
-      await expect(tx).to.emit(tokenLockup, 'EmergencyUnlockCancelled').withArgs(beneficiary.address);
+      await expect(tx)
+        .to.emit(tokenLockup, 'TokensReleased')
+        .withArgs(beneficiary.address, TOTAL_AMOUNT);
+      await expect(tx)
+        .to.emit(tokenLockup, 'EmergencyUnlockCancelled')
+        .withArgs(beneficiary.address);
     });
   });
 
@@ -285,7 +291,9 @@ describe('TokenLockup - Emergency Withdrawal', function () {
 
       const partialRelease = await token.balanceOf(beneficiary.address);
       expect(partialRelease).to.be.gt(0);
-      console.log(`  ✅ Beneficiary released partial: ${ethers.formatEther(partialRelease)} tokens`);
+      console.log(
+        `  ✅ Beneficiary released partial: ${ethers.formatEther(partialRelease)} tokens`
+      );
 
       // Complete vesting + 6 months
       await time.increase(VESTING_DURATION / 2 + SIX_MONTHS);
@@ -345,8 +353,10 @@ describe('TokenLockup - Emergency Withdrawal', function () {
       expect(vestedAmount).to.be.gt(0);
       console.log(`  ✅ Vested at revoke: ${ethers.formatEther(vestedAmount)} tokens`);
 
-      // For revoked lockups, no 6-month waiting required
-      // Request emergency unlock immediately
+      // For revoked lockups, must wait 6 months after revocation
+      await time.increase(SIX_MONTHS);
+
+      // Request emergency unlock after 6 months
       await tokenLockup.requestEmergencyUnlock(beneficiary.address);
 
       // Wait grace period
@@ -360,15 +370,24 @@ describe('TokenLockup - Emergency Withdrawal', function () {
       // Owner should receive the vested (but unclaimed) amount
       const ownerReceived = ownerBalanceAfter - ownerBalanceBefore;
       expect(ownerReceived).to.equal(vestedAmount);
-      console.log(`  ✅ Owner recovered vested amount: ${ethers.formatEther(ownerReceived)} tokens`);
+      console.log(
+        `  ✅ Owner recovered vested amount: ${ethers.formatEther(ownerReceived)} tokens`
+      );
     });
 
-    it('Should not require 6-month wait for revoked lockups', async function () {
+    it('Should require 6-month wait for revoked lockups', async function () {
       // Vest 50%, then revoke
       await time.increase(VESTING_DURATION / 2);
       await tokenLockup.revoke(beneficiary.address);
 
-      // Can request unlock immediately (no 6-month wait for revoked)
+      // Cannot request unlock immediately (must wait 6 months after revocation)
+      await expect(tokenLockup.requestEmergencyUnlock(beneficiary.address)).to.be.revertedWithCustomError(
+        tokenLockup,
+        'EmergencyUnlockTooEarly'
+      );
+
+      // After 6 months, can request unlock
+      await time.increase(SIX_MONTHS);
       await expect(tokenLockup.requestEmergencyUnlock(beneficiary.address)).to.not.be.reverted;
     });
   });

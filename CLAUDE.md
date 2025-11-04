@@ -254,11 +254,35 @@ Recent security improvements based on comprehensive audit (Grade: A-):
       - TokenLockup deployment: +170K gas for emergency withdrawal logic
     - **Protection:** Prevents owner from immediately recovering unclaimed tokens, gives beneficiary ample time to respond
     - **Use Case:** Beneficiary loses wallet access, owner can recover after ~6.8 months total waiting time
-    - **Test Coverage:** Pending - requires comprehensive tests for all stages and edge cases
+    - **Test Coverage:** 29 comprehensive tests covering all scenarios (Basic flow, Timing, Cancellation, Revoked lockups, Edge cases, Access control, State consistency, Gas measurements)
 
-All improvements maintain gas efficiency while significantly enhancing security posture. Full test coverage: 97 unit tests + 70 integration tests passing.
+16. **Enhanced changeToken() ERC20 Validation** (contracts/TokenLockup.sol:399-415)
+    - **Problem:** changeToken() lacked ERC20 interface validation that constructor had
+    - **Solution:** Added consistent validation (extcodesize + totalSupply + balanceOf checks)
+    - **Validation Steps:**
+      1. Zero address check
+      2. Same token check
+      3. Zero balance requirement
+      4. No active lockups requirement
+      5. **NEW:** extcodesize check (prevents EOA)
+      6. **NEW:** ERC20 interface validation (try-catch for totalSupply/balanceOf)
+    - **Gas Impact:** +~15K gas per changeToken() call
+    - **Benefit:** Defense-in-depth, prevents setting invalid token addresses
+    - **Consistency:** Matches constructor validation logic exactly
 
-**Security Grade: A (upgraded from A-)**
+17. **Emergency Unlock Constants** (contracts/TokenLockup.sol:43-44)
+    - **Problem:** Magic numbers (180 days, 30 days) used directly in code
+    - **Solution:** Extracted to named public constants
+    - **Constants Added:**
+      - `EMERGENCY_UNLOCK_WAITING_PERIOD = 180 days` (6 months after vesting/revocation)
+      - `EMERGENCY_UNLOCK_GRACE_PERIOD = 30 days` (beneficiary response window)
+    - **Benefits:** Improved readability, centralized configuration, easier auditing
+    - **Gas Impact:** None (constants are inlined by compiler)
+    - **Usage:** requestEmergencyUnlock() uses both constants for time validation
+
+All improvements maintain gas efficiency while significantly enhancing security posture. Full test coverage: 117 unit tests (62 core + 26 enumeration + 29 emergency) + 70 integration tests passing.
+
+**Security Grade: A** (maintained)
 
 ### Lockup Enumeration
 

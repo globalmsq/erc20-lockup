@@ -894,5 +894,21 @@ describe('TokenLockup', function () {
       await tokenLockup.changeToken(await newToken.getAddress());
       expect(await tokenLockup.token()).to.equal(await newToken.getAddress());
     });
+
+    it('Should revert when new token is an EOA (not a contract)', async function () {
+      await tokenLockup.pause();
+      // Try to change to an EOA address (otherAccount)
+      await expect(
+        tokenLockup.changeToken(otherAccount.address)
+      ).to.be.revertedWithCustomError(tokenLockup, 'InvalidTokenAddress');
+    });
+
+    it('Should revert when new token does not implement ERC20', async function () {
+      await tokenLockup.pause();
+      // Try to change to the TokenLockup contract itself (not an ERC20)
+      await expect(
+        tokenLockup.changeToken(await tokenLockup.getAddress())
+      ).to.be.revertedWithCustomError(tokenLockup, 'InvalidTokenAddress');
+    });
   });
 });

@@ -26,7 +26,7 @@ describe('Integration: Periodic 1% Monthly Release', function () {
 
     // Deploy fresh contracts for each test to ensure accurate timing
     const MockERC20Factory = await ethers.getContractFactory('MockERC20');
-    token = await MockERC20Factory.deploy('SUT Token', 'SUT', ethers.parseEther('1000000'));
+    token = await MockERC20Factory.deploy('TEST Token', 'TEST', ethers.parseEther('1000000'));
     await token.waitForDeployment();
 
     const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');

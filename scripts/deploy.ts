@@ -21,7 +21,7 @@ async function main() {
     );
   }
 
-  console.log('\nUsing SUT Token at:', tokenAddress);
+  console.log('\nUsing TEST Token at:', tokenAddress);
 
   // Deploy TokenLockup
   console.log('\nDeploying TokenLockup...');
@@ -64,8 +64,8 @@ async function main() {
 
   if (chainId === 137n || chainId === 80002n) {
     const expectedTokens: { [key: string]: string } = {
-      '137': '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55', // Polygon Mainnet SUT
-      '80002': '0xE4C687167705Abf55d709395f92e254bdF5825a2', // Amoy Testnet SUT
+      '137': '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55', // Polygon Mainnet TEST
+      '80002': '0xE4C687167705Abf55d709395f92e254bdF5825a2', // Amoy Testnet TEST
     };
 
     const expectedToken = expectedTokens[chainId.toString()];
@@ -74,7 +74,7 @@ async function main() {
       tokenAddress.toLowerCase() !== expectedToken.toLowerCase() &&
       process.env.TOKEN_ADDRESS
     ) {
-      console.log('\n⚠️  Warning: Token address does not match expected SUT token address');
+      console.log('\n⚠️  Warning: Token address does not match expected TEST token address');
       console.log('  Expected:', expectedToken);
       console.log('  Actual:', tokenAddress);
     }

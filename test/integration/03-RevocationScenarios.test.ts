@@ -24,7 +24,7 @@ describe('Integration: Revocation Scenarios', function () {
 
     // Deploy fresh contracts for each test to ensure complete state isolation
     const MockERC20Factory = await ethers.getContractFactory('MockERC20');
-    token = await MockERC20Factory.deploy('SUT Token', 'SUT', ethers.parseEther('1000000'));
+    token = await MockERC20Factory.deploy('TEST Token', 'TEST', ethers.parseEther('1000000'));
     await token.waitForDeployment();
 
     const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
@@ -282,8 +282,8 @@ describe('Integration: Revocation Scenarios', function () {
         // Fresh deployment for each test
         const MockERC20Factory = await ethers.getContractFactory('MockERC20');
         const freshToken = await MockERC20Factory.deploy(
-          'SUT Token',
-          'SUT',
+          'TEST Token',
+          'TEST',
           ethers.parseEther('10000000')
         );
         await freshToken.waitForDeployment();

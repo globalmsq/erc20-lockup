@@ -75,27 +75,27 @@ describe('TokenLockup - Token Validation', function () {
   });
 
   describe('Network-Specific Token Addresses', function () {
-    it('Should accept Polygon Mainnet SUT token address on Polygon network', async function () {
+    it('Should accept Polygon Mainnet TEST token address on Polygon network', async function () {
       // This test demonstrates the intended usage
       // Note: This will only work on Polygon mainnet or forked network
-      const POLYGON_MAINNET_SUT = '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55';
+      const POLYGON_MAINNET_TEST = '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55';
 
       // On local hardhat network, this address has no code, so deployment should fail
       const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
-      await expect(TokenLockupFactory.deploy(POLYGON_MAINNET_SUT)).to.be.revertedWithCustomError(
+      await expect(TokenLockupFactory.deploy(POLYGON_MAINNET_TEST)).to.be.revertedWithCustomError(
         TokenLockupFactory,
         'InvalidTokenAddress'
       );
     });
 
-    it('Should accept Amoy Testnet SUT token address on Amoy network', async function () {
+    it('Should accept Amoy Testnet TEST token address on Amoy network', async function () {
       // This test demonstrates the intended usage
       // Note: This will only work on Amoy testnet or forked network
-      const AMOY_TESTNET_SUT = '0xE4C687167705Abf55d709395f92e254bdF5825a2';
+      const AMOY_TESTNET_TEST = '0xE4C687167705Abf55d709395f92e254bdF5825a2';
 
       // On local hardhat network, this address has no code, so deployment should fail
       const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
-      await expect(TokenLockupFactory.deploy(AMOY_TESTNET_SUT)).to.be.revertedWithCustomError(
+      await expect(TokenLockupFactory.deploy(AMOY_TESTNET_TEST)).to.be.revertedWithCustomError(
         TokenLockupFactory,
         'InvalidTokenAddress'
       );
@@ -103,18 +103,18 @@ describe('TokenLockup - Token Validation', function () {
 
     it('Should demonstrate network mismatch prevention', async function () {
       // This test shows that using mainnet address on testnet (or vice versa) will fail
-      const POLYGON_MAINNET_SUT = '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55';
-      const AMOY_TESTNET_SUT = '0xE4C687167705Abf55d709395f92e254bdF5825a2';
+      const POLYGON_MAINNET_TEST = '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55';
+      const AMOY_TESTNET_TEST = '0xE4C687167705Abf55d709395f92e254bdF5825a2';
 
       const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
 
       // Both should fail on local Hardhat network (no code at these addresses)
-      await expect(TokenLockupFactory.deploy(POLYGON_MAINNET_SUT)).to.be.revertedWithCustomError(
+      await expect(TokenLockupFactory.deploy(POLYGON_MAINNET_TEST)).to.be.revertedWithCustomError(
         TokenLockupFactory,
         'InvalidTokenAddress'
       );
 
-      await expect(TokenLockupFactory.deploy(AMOY_TESTNET_SUT)).to.be.revertedWithCustomError(
+      await expect(TokenLockupFactory.deploy(AMOY_TESTNET_TEST)).to.be.revertedWithCustomError(
         TokenLockupFactory,
         'InvalidTokenAddress'
       );

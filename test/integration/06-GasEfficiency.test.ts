@@ -32,7 +32,7 @@ describe('Integration: Gas Efficiency Analysis', function () {
 
     // Deploy contracts
     const MockERC20Factory = await ethers.getContractFactory('MockERC20');
-    token = await MockERC20Factory.deploy('SUT Token', 'SUT', ethers.parseEther('1000000'));
+    token = await MockERC20Factory.deploy('TEST Token', 'TEST', ethers.parseEther('1000000'));
     await token.waitForDeployment();
 
     const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
@@ -49,8 +49,8 @@ describe('Integration: Gas Efficiency Analysis', function () {
       // Deploy new instances to measure
       const MockERC20Factory = await ethers.getContractFactory('MockERC20');
       const tokenTx = await MockERC20Factory.deploy(
-        'SUT Token',
-        'SUT',
+        'TEST Token',
+        'TEST',
         ethers.parseEther('1000000')
       );
       const tokenReceipt = await tokenTx.deploymentTransaction()?.wait();

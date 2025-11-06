@@ -18,8 +18,8 @@ async function main() {
   console.log('\n📦 Deploying MockERC20...');
   const MockERC20 = await ethers.getContractFactory('MockERC20');
   const mockToken = await MockERC20.deploy(
-    'SUT Token',
-    'SUT',
+    'TEST Token',
+    'TEST',
     ethers.parseEther('1000000') // 1M tokens
   );
   await mockToken.waitForDeployment();

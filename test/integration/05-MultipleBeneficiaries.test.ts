@@ -24,7 +24,7 @@ describe('Integration: Multiple Beneficiaries', function () {
 
     // Deploy MockERC20
     const MockERC20Factory = await ethers.getContractFactory('MockERC20');
-    token = await MockERC20Factory.deploy('SUT Token', 'SUT', ethers.parseEther('10000000'));
+    token = await MockERC20Factory.deploy('TEST Token', 'TEST', ethers.parseEther('10000000'));
     await token.waitForDeployment();
   });
 

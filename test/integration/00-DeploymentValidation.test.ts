@@ -110,41 +110,41 @@ describe('Integration: Deployment Validation', function () {
   });
 
   describe('Network Mismatch Prevention', function () {
-    it('Should reject Polygon Mainnet SUT token address on local network', async function () {
+    it('Should reject Polygon Mainnet TEST token address on local network', async function () {
       console.log('📋 Test: Mainnet token on testnet rejection');
 
-      // Polygon Mainnet SUT token address
-      const POLYGON_MAINNET_SUT = '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55';
+      // Polygon Mainnet TEST token address
+      const POLYGON_MAINNET_TEST = '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55';
 
       const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
 
       // On local hardhat network, this address has no code, so deployment should fail
-      await expect(TokenLockupFactory.deploy(POLYGON_MAINNET_SUT)).to.be.revertedWithCustomError(
+      await expect(TokenLockupFactory.deploy(POLYGON_MAINNET_TEST)).to.be.revertedWithCustomError(
         TokenLockupFactory,
         'InvalidTokenAddress'
       );
 
       console.log('  ✅ Mainnet address correctly rejected on local network');
-      console.log(`    Address: ${POLYGON_MAINNET_SUT}`);
+      console.log(`    Address: ${POLYGON_MAINNET_TEST}`);
       console.log('    Reason: No contract code at address on local network');
     });
 
-    it('Should reject Amoy Testnet SUT token address on local network', async function () {
+    it('Should reject Amoy Testnet TEST token address on local network', async function () {
       console.log('📋 Test: Amoy token on local network rejection');
 
-      // Amoy Testnet SUT token address
-      const AMOY_TESTNET_SUT = '0xE4C687167705Abf55d709395f92e254bdF5825a2';
+      // Amoy Testnet TEST token address
+      const AMOY_TESTNET_TEST = '0xE4C687167705Abf55d709395f92e254bdF5825a2';
 
       const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');
 
       // On local hardhat network, this address has no code, so deployment should fail
-      await expect(TokenLockupFactory.deploy(AMOY_TESTNET_SUT)).to.be.revertedWithCustomError(
+      await expect(TokenLockupFactory.deploy(AMOY_TESTNET_TEST)).to.be.revertedWithCustomError(
         TokenLockupFactory,
         'InvalidTokenAddress'
       );
 
       console.log('  ✅ Amoy address correctly rejected on local network');
-      console.log(`    Address: ${AMOY_TESTNET_SUT}`);
+      console.log(`    Address: ${AMOY_TESTNET_TEST}`);
       console.log('    Reason: No contract code at address on local network');
     });
   });
@@ -156,12 +156,12 @@ describe('Integration: Deployment Validation', function () {
       // Step 1: Deploy token
       const MockERC20Factory = await ethers.getContractFactory('MockERC20');
       const sutToken = await MockERC20Factory.deploy(
-        'SUT Token',
-        'SUT',
+        'TEST Token',
+        'TEST',
         ethers.parseEther('1000000')
       );
       await sutToken.waitForDeployment();
-      console.log(`  Step 1: SUT token deployed at ${await sutToken.getAddress()}`);
+      console.log(`  Step 1: TEST token deployed at ${await sutToken.getAddress()}`);
 
       // Step 2: Deploy TokenLockup with correct token address
       const TokenLockupFactory = await ethers.getContractFactory('TokenLockup');

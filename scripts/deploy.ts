@@ -1,5 +1,87 @@
 import { ethers } from 'hardhat';
 
+/**
+ * Validates that the token is compatible with TokenLockup contract.
+ * Performs automated checks to detect incompatible token types (ERC-777).
+ *
+ * @param tokenAddress - Address of the ERC20 token to validate
+ * @param ethers - Ethers instance for contract interactions
+ * @throws Error if token is incompatible (ERC-777, etc.)
+ */
+async function validateTokenCompatibility(
+  tokenAddress: string,
+  ethers: typeof import('hardhat').ethers
+): Promise<void> {
+  console.log('  Checking for ERC-777 interface...');
+
+  // ERC-777 Detection: Try calling granularity() function
+  // Standard ERC-20 tokens don't have this function
+  try {
+    const tokenContract = await ethers.getContractAt(
+      [
+        'function granularity() view returns (uint256)',
+        'function totalSupply() view returns (uint256)',
+      ],
+      tokenAddress
+    );
+
+    // If this succeeds, it's likely ERC-777
+    const granularity = await tokenContract.granularity();
+
+    throw new Error(
+      '\n❌ ERROR: ERC-777 token detected!\n\n' +
+        `This token implements ERC-777 interface (granularity: ${granularity}).\n` +
+        'ERC-777 tokens have hooks (tokensReceived/tokensToSend) which are\n' +
+        'incompatible with TokenLockup contract due to reentrancy risks.\n\n' +
+        'Please use a standard ERC-20 token instead.\n'
+    );
+  } catch (error: unknown) {
+    // If granularity() call fails, it's likely a standard ERC-20 (good)
+    if (error instanceof Error && error.message.includes('ERC-777 token detected')) {
+      throw error; // Re-throw our custom error
+    }
+    // Expected error for ERC-20 tokens (function doesn't exist)
+    console.log('    ✅ Not an ERC-777 token');
+  }
+
+  // Check ERC1820 Registry for ERC777Token interface
+  console.log('  Checking ERC1820 Registry...');
+  try {
+    const ERC1820_REGISTRY = '0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24';
+    const ERC777_INTERFACE_HASH = ethers.keccak256(ethers.toUtf8Bytes('ERC777Token'));
+
+    const registryContract = await ethers.getContractAt(
+      [
+        'function getInterfaceImplementer(address addr, bytes32 interfaceHash) view returns (address)',
+      ],
+      ERC1820_REGISTRY
+    );
+
+    const implementer = await registryContract.getInterfaceImplementer(
+      tokenAddress,
+      ERC777_INTERFACE_HASH
+    );
+
+    if (implementer !== ethers.ZeroAddress) {
+      throw new Error(
+        '\n❌ ERROR: ERC-777 token detected via ERC1820 Registry!\n\n' +
+          `Token ${tokenAddress} is registered as ERC777Token implementer.\n` +
+          'ERC-777 tokens are incompatible with TokenLockup contract due to reentrancy risks.\n\n' +
+          'Please use a standard ERC-20 token instead.\n'
+      );
+    }
+    console.log('    ✅ No ERC-777 registration found');
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('ERC-777 token detected')) {
+      throw error; // Re-throw our custom error
+    }
+    // If registry doesn't exist on this network, that's fine
+    console.log('    ℹ️  ERC1820 Registry not available on this network (skipped)');
+  }
+
+  console.log('  ✅ Token compatibility check passed');
+}
+
 async function main() {
   const [deployer] = await ethers.getSigners();
 
@@ -23,8 +105,23 @@ async function main() {
 
   console.log('\nUsing TEST Token at:', tokenAddress);
 
+  // Get network info for validation
+  const network = await ethers.provider.getNetwork();
+  const chainId = network.chainId;
+
+  // ============================================================================
+  // TOKEN COMPATIBILITY VALIDATION
+  // ============================================================================
+  console.log('\n🔍 Validating token compatibility...');
+
+  // Automated ERC-777 detection (BLOCKING)
+  await validateTokenCompatibility(tokenAddress, ethers);
+
+  console.log('✅ Token validation passed!\n');
+  // ============================================================================
+
   // Deploy TokenLockup
-  console.log('\nDeploying TokenLockup...');
+  console.log('Deploying TokenLockup...');
   const TokenLockup = await ethers.getContractFactory('TokenLockup');
   const tokenLockup = await TokenLockup.deploy(tokenAddress);
   await tokenLockup.waitForDeployment();
@@ -59,9 +156,6 @@ async function main() {
   }
 
   // Network-specific validation
-  const network = await ethers.provider.getNetwork();
-  const chainId = network.chainId;
-
   if (chainId === 137n || chainId === 80002n) {
     const expectedTokens: { [key: string]: string } = {
       '137': '0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55', // Polygon Mainnet TEST

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SUT Token Lockup smart contract for managing token vesting schedules on Polygon. Implements time-based linear vesting with cliff periods, revocable lockups, and pull payment patterns for gas efficiency.
+ERC20 Token Lockup smart contract for managing token vesting schedules on Polygon. Implements time-based linear vesting with cliff periods, revocable lockups, and pull payment patterns for gas efficiency.
 
 **Key Technologies:**
 
@@ -50,17 +50,19 @@ SUT Token Lockup smart contract for managing token vesting schedules on Polygon.
 - `scripts/*.ts` = Direct Hardhat execution (local/production)
 - `docker/scripts/*.sh` = Container-specific wrappers (Docker only)
 
-## SUT Token Addresses
+## Token Address Configuration
 
-**Critical:** This project works with deployed SUT tokens, not deploying new ones.
+**Critical:** This contract works with deployed ERC20 tokens, not deploying new ones.
+
+**Example Token Addresses** (SUT Token - original project use case):
 
 - **Polygon Mainnet:** `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55`
 - **Polygon Amoy Testnet:** `0xE4C687167705Abf55d709395f92e254bdF5825a2`
 
 **⚠️ IMPORTANT:** Always use the correct token address for your target network:
 
-- ❌ **DO NOT** use Mainnet address on Amoy testnet
-- ❌ **DO NOT** use Amoy address on Polygon mainnet
+- ❌ **DO NOT** use Mainnet address on testnet
+- ❌ **DO NOT** use testnet address on Mainnet
 - ✅ The constructor will validate token exists and is ERC20 compliant
 - ✅ Deployment will fail immediately if token address is invalid or doesn't exist on the network
 
@@ -366,14 +368,14 @@ Stored in `mapping(address => LockupInfo) public lockups`.
 
 **Critical Steps:**
 
-1. **Deploy TokenLockup** with SUT token address
+1. **Deploy TokenLockup** with ERC20 token address
    - Script auto-detects `TOKEN_ADDRESS` from env
    - If empty, deploys MockERC20 for testing
 
 2. **Approve Tokens** (Owner must approve before creating lockup)
 
    ```typescript
-   await sutToken.approve(tokenLockupAddress, lockupAmount);
+   await token.approve(tokenLockupAddress, lockupAmount);
    ```
 
 3. **Create Lockup** (Owner only)
@@ -432,7 +434,7 @@ npx hardhat test --grep "Should release vested tokens"
 **Required for production:**
 
 - `PRIVATE_KEY`: Deployer wallet private key (without 0x prefix)
-- `TOKEN_ADDRESS`: SUT token address (Mainnet or Amoy)
+- `TOKEN_ADDRESS`: ERC20 token address (e.g., SUT on Mainnet or Amoy testnet)
 - `ETHERSCAN_API_KEY`: Etherscan API V2 key - single key for 60+ chains (Ethereum, Polygon, BSC, etc.)
   - Get your key at: https://etherscan.io/myapikey
   - Migration deadline: May 31, 2025 (V1 will be disabled)
@@ -458,8 +460,8 @@ const tokenLockup = await ethers.getContractAt(
   '0x...' // deployed address
 );
 
-// Get SUT token
-const sutToken = await ethers.getContractAt('IERC20', process.env.TOKEN_ADDRESS!);
+// Get ERC20 token
+const token = await ethers.getContractAt('IERC20', process.env.TOKEN_ADDRESS!);
 ```
 
 ### Time Calculations
@@ -715,8 +717,7 @@ The contract owner has significant privileges that require careful handling:
       - Watch for any automatic balance changes over time
 
    4. **Verify Token Type on PolygonScan:**
-      - **Mainnet SUT:** `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55`
-      - **Amoy SUT:** `0xE4C687167705Abf55d709395f92e254bdF5825a2`
+      - Example (SUT Token): Mainnet `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55`, Amoy `0xE4C687167705Abf55d709395f92e254bdF5825a2`
       - Check "Contract" tab → "Read Contract" → verify standard ERC-20 functions only
       - Check "Contract" tab → "Code" → search for ERC-777 keywords
 

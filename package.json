@@ -1,7 +1,7 @@
 {
-  "name": "sut-lockup-contract",
+  "name": "erc20-lockup",
   "version": "1.0.0",
-  "description": "Smart contract for SUT token lockup on Polygon",
+  "description": "Smart contract for ERC20 token lockup on Polygon",
   "main": "index.js",
   "scripts": {
     "build": "hardhat compile",

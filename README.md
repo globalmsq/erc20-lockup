@@ -1,6 +1,6 @@
-# SUT Token Lockup Contract
+# ERC20 Token Lockup Contract
 
-Smart contract for managing SUT token lockup with vesting schedules on Polygon.
+Smart contract for managing ERC20 token lockup with vesting schedules on Polygon.
 
 ## Features
 
@@ -15,13 +15,13 @@ Smart contract for managing SUT token lockup with vesting schedules on Polygon.
 
 ## Documentation
 
-- **[PRD (Product Requirements Document)](docs/prd.md)** - SUT token lockup requirements and specifications
-- **[Lockup Procedure](docs/lockup-procedure.md)** - Step-by-step guide for SUT token lockup process
+- **[PRD (Product Requirements Document)](docs/prd.md)** - ERC20 token lockup requirements and specifications
+- **[Lockup Procedure](docs/lockup-procedure.md)** - Step-by-step guide for ERC20 token lockup process
 
 ## Project Structure
 
 ```
-sut-lockup-contract/
+erc20-lockup/
 ├── contracts/              # Solidity contracts
 │   ├── TokenLockup.sol    # Main lockup contract
 │   └── MockERC20.sol      # Mock token for testing
@@ -103,8 +103,9 @@ PRIVATE_KEY=your_private_key_here
 ETHERSCAN_API_KEY=your_etherscan_api_key_here
 
 # Token Address (Required for production deployment)
-# SUT Token on Polygon Mainnet: 0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55
-# SUT Token on Polygon Amoy Testnet: 0xE4C687167705Abf55d709395f92e254bdF5825a2
+# Example: SUT Token addresses (original project use case)
+#   Polygon Mainnet: 0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55
+#   Polygon Amoy Testnet: 0xE4C687167705Abf55d709395f92e254bdF5825a2
 TOKEN_ADDRESS=
 
 # Optional (uses defaults if not specified)
@@ -114,14 +115,13 @@ AMOY_RPC_URL=https://rpc-amoy.polygon.technology
 
 **⚠️ IMPORTANT - Token Address Validation**:
 
-- `TOKEN_ADDRESS` must be set to the **correct SUT token address for the target network**
-- **Mainnet**: Use `0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55`
-- **Amoy Testnet**: Use `0xE4C687167705Abf55d709395f92e254bdF5825a2`
-- ❌ **DO NOT** use Mainnet address on Amoy testnet (deployment will fail)
-- ❌ **DO NOT** use Amoy address on Polygon mainnet (deployment will fail)
+- `TOKEN_ADDRESS` must be set to the **correct ERC20 token address for the target network**
+- Example addresses shown above are for SUT token (original project use case)
+- ❌ **DO NOT** use Mainnet address on testnet (deployment will fail)
+- ❌ **DO NOT** use testnet address on Mainnet (deployment will fail)
 - ✅ The constructor validates that the token exists and implements ERC20 standard
 - ✅ Deployment fails immediately with `InvalidTokenAddress()` if token is invalid
-- For testing without real SUT tokens, leave `TOKEN_ADDRESS` empty to deploy MockERC20
+- For testing without real tokens, leave `TOKEN_ADDRESS` empty to deploy MockERC20
 
 ## Development
 
@@ -330,13 +330,14 @@ The script will:
 >
 > ```typescript
 > // Step 1: Approve tokens (REQUIRED)
-> await sutToken.approve(lockupAddress, amount);
+> await token.approve(lockupAddress, amount);
 >
 > // Step 2: Create lockup
 > await tokenLockup.createLockup(...);
 > ```
 >
-> **Using PolygonScan?** Go to the [SUT token contract](https://polygonscan.com/address/0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55#writeContract), approve tokens first, then create the lockup at the TokenLockup contract.
+> **Using PolygonScan?** Go to your ERC20 token contract, approve tokens first, then create the lockup at the TokenLockup contract.
+> Example with SUT token: Go to the [SUT token contract](https://polygonscan.com/address/0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55#writeContract), approve tokens first, then create the lockup.
 
 ### Creating a Lockup (Programmatic)
 
@@ -414,13 +415,13 @@ console.log(`Claimable: ${ethers.formatEther(releasable)} tokens`);
 
 **Example scenario**:
 
-- Total lockup: 100 SUT
-- Current vested: 20.5 SUT
-- Already released: 14.13 SUT
+- Total lockup: 100 tokens
+- Current vested: 20.5 tokens
+- Already released: 14.13 tokens
 - **After revoke**:
-  - Owner receives: 100 - 20.5 = **79.5 SUT** (unvested)
-  - Beneficiary keeps: **14.13 SUT** (already released)
-  - Beneficiary can still claim: 20.5 - 14.13 = **6.37 SUT** (vested but not released)
+  - Owner receives: 100 - 20.5 = **79.5 tokens** (unvested)
+  - Beneficiary keeps: **14.13 tokens** (already released)
+  - Beneficiary can still claim: 20.5 - 14.13 = **6.37 tokens** (vested but not released)
 
 > **⚠️ Warning**: Revoke is permanent and cannot be undone. Only works on lockups created with `revocable: true`.
 
@@ -512,8 +513,8 @@ while (processed < total) {
     const lockup = batch.lockupInfos[i];
 
     console.log(`Beneficiary: ${address}`);
-    console.log(`Total: ${ethers.formatEther(lockup.totalAmount)} SUT`);
-    console.log(`Released: ${ethers.formatEther(lockup.releasedAmount)} SUT`);
+    console.log(`Total: ${ethers.formatEther(lockup.totalAmount)} tokens`);
+    console.log(`Released: ${ethers.formatEther(lockup.releasedAmount)} tokens`);
     console.log(`Status: ${lockup.revoked ? 'Revoked' : 'Active'}`);
     console.log('---');
   }
@@ -730,7 +731,8 @@ Create `.env.docker.example` for Docker-specific settings:
 
 ```bash
 # Token Address (required for hardhat-deploy service)
-TOKEN_ADDRESS=0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55  # Polygon Mainnet SUT
+# Example: SUT Token on Polygon Mainnet (original project use case)
+TOKEN_ADDRESS=0x98965474EcBeC2F532F1f780ee37b0b05F77Ca55
 
 # Deployment Network (for hardhat-deploy service)
 # Options: localhost, polygon, amoy
